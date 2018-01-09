@@ -22,7 +22,7 @@ class Vector4 {
 
 	public Vector4 mult(Vector4 other) {
 		return new Vector4(x * other.x, y * other.y, z * other.z, w * other.w);
-	} 
+	}
 
 	public float dot(Vector4 other) {
 		return x * other.x + y * other.y + z * other.z + w * other.w;

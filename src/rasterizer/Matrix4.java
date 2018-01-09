@@ -23,9 +23,9 @@ public class Matrix4 {
 
 	public Vector4 mult(Vector4 other) {
 		return new Vector4(
-			a.dot(other), 
-			b.dot(other), 
-			c.dot(other), 
+			a.dot(other),
+			b.dot(other),
+			c.dot(other),
 			d.dot(other));
 	}
 
@@ -33,24 +33,24 @@ public class Matrix4 {
 		Matrix4 tother = other.transpose();
 		return new Matrix4(
 			new Vector4(
-				a.dot(tother.a), 
-				a.dot(tother.b), 
-				a.dot(tother.c), 
+				a.dot(tother.a),
+				a.dot(tother.b),
+				a.dot(tother.c),
 				a.dot(tother.d)),
 			new Vector4(
-				b.dot(tother.a), 
-				b.dot(tother.b), 
-				b.dot(tother.c), 
+				b.dot(tother.a),
+				b.dot(tother.b),
+				b.dot(tother.c),
 				b.dot(tother.d)),
 			new Vector4(
-				c.dot(tother.a), 
-				c.dot(tother.b), 
-				c.dot(tother.c), 
+				c.dot(tother.a),
+				c.dot(tother.b),
+				c.dot(tother.c),
 				c.dot(tother.d)),
 			new Vector4(
-				d.dot(tother.a), 
-				d.dot(tother.b), 
-				d.dot(tother.c), 
+				d.dot(tother.a),
+				d.dot(tother.b),
+				d.dot(tother.c),
 				d.dot(tother.d)));
 	}
 
@@ -82,7 +82,7 @@ public class Matrix4 {
 		float cdeg = (float) Math.cos(Math.toRadians(deg));
 		return new Matrix4(
 			new Vector4(1.0f, 0.0f, 0.0f, 0.0f),
-			new Vector4(0.0f, cdeg, sdeg, 0.0f),
+			new Vector4(0.0f, cdeg, -sdeg, 0.0f),
 			new Vector4(0.0f, sdeg, cdeg, 0.0f),
 			new Vector4(0.0f, 0.0f, 0.0f, 1.0f));
 	}
@@ -101,7 +101,7 @@ public class Matrix4 {
 		float sdeg = (float) Math.sin(Math.toRadians(deg));
 		float cdeg = (float) Math.cos(Math.toRadians(deg));
 		return new Matrix4(
-			new Vector4(cdeg, sdeg, 0.0f, 0.0f),
+			new Vector4(cdeg, -sdeg, 0.0f, 0.0f),
 			new Vector4(sdeg, cdeg, 0.0f, 0.0f),
 			new Vector4(0.0f, 0.0f, 1.0f, 0.0f),
 			new Vector4(0.0f, 0.0f, 0.0f, 1.0f));

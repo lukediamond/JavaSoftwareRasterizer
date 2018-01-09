@@ -23,6 +23,16 @@ public class Mesh {
 		m_coords     = coords;
 	}
 
+	public Mesh(int texID, MeshResource res) {
+		m_position  = new Vector3(0.0f, 0.0f, 0.0f);
+		m_rotation  = new Vector3(0.0f, 0.0f, 0.0f);
+		m_scale     = new Vector3(1.0f, 1.0f, 1.0f);
+		m_textureID = texID;
+		m_verts     = res.getVerts();
+		m_coords    = res.getCoords();
+		m_triCount  = m_verts.length / 3;
+	}
+
 	public void setScale(float x, float y, float z) {
 		m_scale.x = x;
 		m_scale.y = y;

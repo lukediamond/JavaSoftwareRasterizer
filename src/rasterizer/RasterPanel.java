@@ -21,21 +21,9 @@ public class RasterPanel extends JPanel {
 	private int m_meshIndex = 0;
 	private int m_screenWidth;
 	private int m_screenHeight;
+	IUpdateListener m_listener;
 
-	final int m_RESDIVISOR = 2;
-
-	float getSlope(Point a, Point b) {
-		float dx = b.x - a.x;
-		float dy = b.y - a.y;
-		if (dy == 0.0f) return 0.0f;
-		return dy / dx;
-	}
-
-	int getYInterval(Point a, Point b) {
-		float slope = getSlope(a, b);
-		if (slope == 0.0f) return 1;
-		return Math.round(1.0f / slope);
-	}
+	final int m_RESDIVISOR = 8;
 
 	float lerp(float a, float b, float alpha) {
 		return (1.0f - alpha) * a + alpha * b;
@@ -43,9 +31,12 @@ public class RasterPanel extends JPanel {
 
 	Color lerpColor(Color a, Color b, float alpha) {
 		return new Color(
-			Math.round(lerp(a.getRed(),   b.getRed(),   alpha)),
-			Math.round(lerp(a.getGreen(), b.getGreen(), alpha)),
-			Math.round(lerp(a.getBlue(),  b.getBlue(),  alpha)));
+		Math.round(lerp((float) a.getRed(), (float) b.getRed(), alpha)),
+		Math.round(
+			lerp((float) a.getGreen(), (float) b.getGreen(), alpha)),
+		Math.round(
+			lerp((float) a.getBlue(), (float) b.getBlue(), alpha)));
+
 	}
 
 	float pointDist(Point a, Point b) {
@@ -60,19 +51,17 @@ public class RasterPanel extends JPanel {
 		return x;
 	}
 
-	int sampleImage(BufferedImage image, float x, float y) {
-		if (image == null) return 0;
-		int xpos = 
+	Color sampleImage(BufferedImage image, float x, float y) {
+		if (image == null) return Color.BLACK;
+		int xpos =
 			(int) clamp(
-				(int) Math.ceil(x * image.getWidth()), 
+				(int) Math.ceil(x * image.getWidth()),
 				0, image.getWidth() - 1);
-		int ypos = 
+		int ypos =
 			(int) clamp(
-				(int) Math.ceil(y * image.getHeight()), 
+				(int) Math.ceil(y * image.getHeight()),
 				0, image.getHeight() - 1);
-		return image.getRGB(
-			xpos,
-			image.getHeight() - ypos - 1);
+		return new Color(image.getRGB(xpos, image.getHeight() - ypos - 1));
 	}
 
 	public void addTexture(Integer id, String path) {
@@ -85,7 +74,9 @@ public class RasterPanel extends JPanel {
 	}
 
 	void fillTriangle(
-		int   id,
+		int     id,
+		Matrix4 model,
+		Matrix4 proj,
 		Vector3 va,
 		Vector3 vb,
 		Vector3 vc,
@@ -96,6 +87,9 @@ public class RasterPanel extends JPanel {
 		BufferedImage tex = m_textures[id];
 		final int ITER = m_screenHeight;
 		final float INVERSE_ITER = 1.0f / ITER;
+
+		Matrix4 mp = proj.mult(model);
+
 		for (int i = 0; i < ITER; ++i) {
 			float alphaX = (float) i * INVERSE_ITER;
 			Vector3 ia = va.lerp(vb, alphaX);
@@ -105,24 +99,34 @@ public class RasterPanel extends JPanel {
 			for (int i2 = 0; i2 < ITER; ++i2) {
 				float alphaY = (float) i2 * INVERSE_ITER;
 				Vector3 ic = ia.lerp(ib, alphaY);
+				Vector3 ssc = projectVert(mp, ic);
 				Vector2 it = ita.lerp(itb, alphaY);
-				int color = sampleImage(tex, it.x, it.y);
+
+				Vector3 lightPos = new Vector3(1.0f, 0.0f, 4.0f);
+				Vector3 world = model.mult(new Vector4(ic, 1.0f)).wdivide();
+				Color color = sampleImage(tex, it.x, it.y);
+				float dist = (float) Math.pow(world.distance(lightPos), 2.0f);
+				color =
+					lerpColor(
+						Color.BLACK,
+						color,
+						clamp((1.0f / (1.0f + dist)), 0.0f, 1.0f));
 				int dcoordX =
 					(int) clamp(
-						(ic.x + 1.0f) * 0.5f * m_screenWidth,
+						(ssc.x + 1.0f) * 0.5f * m_screenWidth,
 						0.0f,
 						(float) m_screenWidth - 1);
 				int dcoordY =
 					(int) clamp(
-						(ic.y + 1.0f) * 0.5f * m_screenHeight,
+						(ssc.y + 1.0f) * 0.5f * m_screenHeight,
 						0.0f,
 						(float) m_screenHeight - 1);
-				if (ic.z > m_depthBuffer[dcoordX][dcoordY]) {
-					m_depthBuffer[dcoordX][dcoordY] = ic.z;
+				if (ssc.z < m_depthBuffer[dcoordX][dcoordY]) {
+					m_depthBuffer[dcoordX][dcoordY] = ssc.z;
 					m_backBuffer.setRGB(
 						(int) dcoordX,
 						(int) m_screenHeight - dcoordY - 1,
-						color);
+						color.getRGB());
 				}
 			}
 		}
@@ -143,24 +147,25 @@ public class RasterPanel extends JPanel {
 	public void paintComponent(Graphics g) {
 		Graphics ig = m_backBuffer.getGraphics();
 
-		Matrix4 proj = 
+		Matrix4 proj =
 			Matrix4.perspective(
-				(float) m_backBuffer.getWidth() 
-				/ (float) m_backBuffer.getHeight(), 
-				10.0f, 
-				0.01f, 
+				(float) m_backBuffer.getWidth()
+				/ (float) m_backBuffer.getHeight(),
+				45.0f,
+				0.01f,
 				100.0f);
 
 		for (int i = 0; i < m_meshIndex; ++i) {
 			Mesh m = m_meshes[i];
 			Vector3[] verts = m.getVerts();
-			Matrix4 mp = proj.mult(m.getTransformMatrix());
 			for (int v = 0; v < m.getTriCount() * 3; v += 3) {
 				fillTriangle(
 					m.getTextureID(),
-					projectVert(mp, verts[v + 0]),
-					projectVert(mp, verts[v + 1]),
-					projectVert(mp, verts[v + 2]),
+					m.getTransformMatrix(),
+					proj,
+					verts[v + 0],
+					verts[v + 1],
+					verts[v + 2],
 					m.getCoords()[v + 0],
 					m.getCoords()[v + 1],
 					m.getCoords()[v + 2]);
@@ -177,7 +182,7 @@ public class RasterPanel extends JPanel {
 		ig.clearRect(0, 0, m_screenWidth, m_screenHeight);
 		for (int y = 0; y < m_screenHeight; ++y) {
 			for (int x = 0; x < m_screenWidth; ++x) {
-				m_depthBuffer[x][y] = 0.0f;
+				m_depthBuffer[x][y] = 1.0f;
 			}
 		}
 
@@ -193,6 +198,15 @@ public class RasterPanel extends JPanel {
 			m_frames = 0;
 			m_fpsAccumulator = 0.0f;
 		}
+
+		if (m_listener != null) {
+			m_listener.update(delta);
+		}
+	}
+
+	public void setUpdateListener(IUpdateListener listener) {
+		m_listener = listener;
+
 	}
 
 	public void addMesh(Mesh m) {
