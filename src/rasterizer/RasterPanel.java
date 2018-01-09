@@ -166,6 +166,7 @@ public class RasterPanel extends JPanel {
 
 		// Define the position of the point light in the scene.
 		Vector3 lightPos = new Vector3(0.0f, 1.0f, 2.0f);
+		Color lightColor = new Color(128, 0, 0);
 
 		// Define the aspect ratio of the screen.
 		final float ASPECT = (float) m_screenWidth / (float) m_screenHeight;
@@ -231,7 +232,7 @@ public class RasterPanel extends JPanel {
 						(float) m_screenHeight - 1);
 
 				// Perform depth test to prevent drawing occluded fragments.
-				if (ssc.z < m_depthBuffer[dcoordX][dcoordY]) {
+				if (ssc.z == 1.0f || ssc.z < m_depthBuffer[dcoordX][dcoordY]) {
 					// Compute texture coordinate by blending first interpolated
 					// coordinate with second interpolated coordinate.
 					it = ita.lerp(itb, alphaY);
@@ -249,15 +250,19 @@ public class RasterPanel extends JPanel {
 					// the attenuation factor as the alpha.
 					color =
 						lerpColor(
-							Color.BLACK,
-							color,
-							clamp(atten * 2.0f, 0.0f, 1.0f));
+							lerpColor(Color.BLACK, color, (float) Math.pow(atten, 0.5f)),
+							lightColor,
+							clamp(atten * 1.0f, 0.0f, 1.0f));
 
 					// Write screen-space depth value to depth buffer.
 					m_depthBuffer[dcoordX][dcoordY] = ssc.z;
 					// Write color to backbuffer.
 					m_backBuffer.setRGB(
 						(int) dcoordX,
+						(int) m_screenHeight - dcoordY - 1,
+						color.getRGB());
+					m_backBuffer.setRGB(
+						(int) clamp(dcoordX - 1, 0, m_screenWidth - 1),
 						(int) m_screenHeight - dcoordY - 1,
 						color.getRGB());
 				}
@@ -300,7 +305,7 @@ public class RasterPanel extends JPanel {
 				/ (float) m_backBuffer.getHeight(),
 				90.0f,
 				0.01f,
-				100.0f);
+				10.0f);
 
 		// Create pool for render threads.
 		ArrayList<Thread> threadPool = new ArrayList<Thread>();
