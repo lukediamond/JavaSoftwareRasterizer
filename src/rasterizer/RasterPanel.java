@@ -7,6 +7,7 @@ import java.awt.Color;
 import javax.swing.JPanel;
 import java.awt.Point;
 import java.util.HashMap;
+import java.util.ArrayList;
 import java.io.IOException;
 import java.io.File;
 
@@ -23,7 +24,7 @@ public class RasterPanel extends JPanel {
 	private int m_screenHeight;
 	IUpdateListener m_listener;
 
-	final int m_RESDIVISOR = 8;
+	final int m_RESDIVISOR = 3;
 
 	float lerp(float a, float b, float alpha) {
 		return (1.0f - alpha) * a + alpha * b;
@@ -85,32 +86,52 @@ public class RasterPanel extends JPanel {
 		Vector2 tc) {
 
 		BufferedImage tex = m_textures[id];
-		final int ITER = m_screenHeight;
-		final float INVERSE_ITER = 1.0f / ITER;
 
 		Matrix4 mp = proj.mult(model);
 
-		for (int i = 0; i < ITER; ++i) {
-			float alphaX = (float) i * INVERSE_ITER;
-			Vector3 ia = va.lerp(vb, alphaX);
-			Vector3 ib = va.lerp(vc, alphaX);
-			Vector2 ita = ta.lerp(tb, alphaX);
-			Vector2 itb = ta.lerp(tc, alphaX);
-			for (int i2 = 0; i2 < ITER; ++i2) {
-				float alphaY = (float) i2 * INVERSE_ITER;
-				Vector3 ic = ia.lerp(ib, alphaY);
-				Vector3 ssc = projectVert(mp, ic);
-				Vector2 it = ita.lerp(itb, alphaY);
+		float alphaX;
+		Vector3 ia;
+		Vector3 ib;
+		Vector2 ita;
+		Vector2 itb;
 
-				Vector3 lightPos = new Vector3(1.0f, 0.0f, 4.0f);
+		Vector3 lightPos = new Vector3(0.0f, 1.0f, 2.0f);
+
+		final float ASPECT = (float) m_screenWidth / (float) m_screenHeight;
+
+		final int ITER_X = Math.round(m_screenWidth * ASPECT);
+		final int ITER_Y = Math.round(m_screenHeight / ASPECT);
+		final float ITER_X_INV = 1.0f / ITER_X;
+		final float ITER_Y_INV = 1.0f / ITER_Y;
+
+		for (int i = 0; i < ITER_X; ++i) {
+			alphaX = (float) i * ITER_X_INV;
+			ia = va.lerp(vb, alphaX);
+			ib = va.lerp(vc, alphaX);
+			ita = ta.lerp(tb, alphaX);
+			itb = ta.lerp(tc, alphaX);
+
+			float alphaY;
+			Vector3 ic;
+			Vector3 ssc;
+			Vector2 it;
+
+			for (int i2 = 0; i2 < ITER_Y; ++i2) {
+				alphaY = (float) i2 * ITER_Y_INV;
+				ic = ia.lerp(ib, alphaY);
+				ssc = mp.mult(new Vector4(ic, 1.0f)).wdivide();
+				it = ita.lerp(itb, alphaY);
+
 				Vector3 world = model.mult(new Vector4(ic, 1.0f)).wdivide();
 				Color color = sampleImage(tex, it.x, it.y);
+
 				float dist = (float) Math.pow(world.distance(lightPos), 2.0f);
 				color =
 					lerpColor(
 						Color.BLACK,
 						color,
 						clamp((1.0f / (1.0f + dist)), 0.0f, 1.0f));
+
 				int dcoordX =
 					(int) clamp(
 						(ssc.x + 1.0f) * 0.5f * m_screenWidth,
@@ -121,6 +142,7 @@ public class RasterPanel extends JPanel {
 						(ssc.y + 1.0f) * 0.5f * m_screenHeight,
 						0.0f,
 						(float) m_screenHeight - 1);
+
 				if (ssc.z < m_depthBuffer[dcoordX][dcoordY]) {
 					m_depthBuffer[dcoordX][dcoordY] = ssc.z;
 					m_backBuffer.setRGB(
@@ -137,12 +159,6 @@ public class RasterPanel extends JPanel {
 	float m_fpsAccumulator = 0.0f;
 	int   m_frames         = 0;
 
-	private Vector3 projectVert(Matrix4 mp, Vector3 vec) {
-		Vector4 pos = new Vector4(vec, 1.0f);
-		Vector3 mvec = mp.mult(pos).wdivide();
-		return new Vector3(mvec.x, mvec.y, mvec.z);
-	}
-
 	@Override
 	public void paintComponent(Graphics g) {
 		Graphics ig = m_backBuffer.getGraphics();
@@ -151,24 +167,45 @@ public class RasterPanel extends JPanel {
 			Matrix4.perspective(
 				(float) m_backBuffer.getWidth()
 				/ (float) m_backBuffer.getHeight(),
-				45.0f,
+				90.0f,
 				0.01f,
 				100.0f);
+
+		ArrayList<Thread> threadPool = new ArrayList<Thread>();
 
 		for (int i = 0; i < m_meshIndex; ++i) {
 			Mesh m = m_meshes[i];
 			Vector3[] verts = m.getVerts();
+
 			for (int v = 0; v < m.getTriCount() * 3; v += 3) {
-				fillTriangle(
-					m.getTextureID(),
-					m.getTransformMatrix(),
-					proj,
-					verts[v + 0],
-					verts[v + 1],
-					verts[v + 2],
-					m.getCoords()[v + 0],
-					m.getCoords()[v + 1],
-					m.getCoords()[v + 2]);
+				Vector3 vert0 = m.getVerts()[v + 0];
+				Vector3 vert1 = m.getVerts()[v + 1];
+				Vector3 vert2 = m.getVerts()[v + 2];
+				Vector2 coord0 = m.getCoords()[v + 0];
+				Vector2 coord1 = m.getCoords()[v + 1];
+				Vector2 coord2 = m.getCoords()[v + 2];
+				Thread t = new Thread(() -> {
+					fillTriangle(
+						m.getTextureID(),
+						m.getTransformMatrix(),
+						proj,
+						vert0,
+						vert1,
+						vert2,
+						coord0,
+						coord1,
+						coord2);
+				});
+				t.start();
+				threadPool.add(t);
+			}
+		}
+
+		for (Thread t : threadPool) {
+			try {
+				t.join();
+			} catch (InterruptedException e) {
+				e.printStackTrace();
 			}
 		}
 
@@ -180,8 +217,8 @@ public class RasterPanel extends JPanel {
 			m_screenHeight * m_RESDIVISOR,
 			null);
 		ig.clearRect(0, 0, m_screenWidth, m_screenHeight);
-		for (int y = 0; y < m_screenHeight; ++y) {
-			for (int x = 0; x < m_screenWidth; ++x) {
+		for (int x = 0; x < m_screenWidth; ++x) {
+			for (int y = 0; y < m_screenHeight; ++y) {
 				m_depthBuffer[x][y] = 1.0f;
 			}
 		}
@@ -206,7 +243,6 @@ public class RasterPanel extends JPanel {
 
 	public void setUpdateListener(IUpdateListener listener) {
 		m_listener = listener;
-
 	}
 
 	public void addMesh(Mesh m) {

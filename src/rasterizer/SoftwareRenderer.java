@@ -19,38 +19,6 @@ public class SoftwareRenderer extends JFrame {
 		this.setDefaultCloseOperation(EXIT_ON_CLOSE);
 		this.setResizable(false);
 
-		Thread renderThread = new Thread(() -> {
-			m_panel.addTexture(0, "img.png");
-			Mesh m = new Mesh(
-				0,
-				new Vector3[] {
-					new Vector3(-1.0f, -1.0f, 1.0f), // bottom left
-					new Vector3(-1.0f, +1.0f, 1.0f), // top left
-					new Vector3(+1.0f, +1.0f, 1.0f), // top right
-
-					new Vector3(+1.0f, +1.0f, 0.0f), // top right
-					new Vector3(+1.0f, -1.0f, 0.0f), // bottom right
-					new Vector3(-1.0f, -1.0f, 0.0f), // bottom left
-				},
-				new Vector2[] {
-					new Vector2(0.0f, 0.0f), // bottom left
-					new Vector2(0.0f, 1.0f), // top left
-					new Vector2(1.0f, 1.0f), // top right
-
-					new Vector2(1.0f, 1.0f), // top right
-					new Vector2(1.0f, 0.0f), // bottom right
-					new Vector2(0.0f, 0.0f), // bottom left
-				});
-			m.setPosition(0.0f, 0.0f, 15.0f);
-			m_panel.addMesh(m);
-			float start = System.nanoTime() * 1E-9f;
-			for (;;) {
-				m_panel.repaint();
-				float now = System.nanoTime() * 1E-9f;
-				m.setRotation(0.0f, 90.0f * (now - start), 0.0f);
-			}
-		});
-
 		this.addKeyListener(new KeyListener() {
 			@Override
 			public void keyPressed(KeyEvent e) {
@@ -72,31 +40,13 @@ public class SoftwareRenderer extends JFrame {
 		this.setContentPane(m_panel);
 		this.setVisible(true);
 
-		m_panel.addTexture(0, "img.png");
+		m_panel.addTexture(0, "difmap.png");
 
 		MeshResource mres = new MeshResource("untitled.obj");
 		Mesh m = new Mesh(
 			0,
-			mres
-			/*new Vector3[] {
-				new Vector3(-1.0f, -1.0f, 0.0f), // bottom left
-				new Vector3(-1.0f, +1.0f, 0.0f), // top left
-				new Vector3(+1.0f, +1.0f, 0.0f), // top right
-
-				new Vector3(+1.0f, +1.0f, 0.0f), // top right
-				new Vector3(+1.0f, -1.0f, 0.0f), // bottom right
-				new Vector3(-1.0f, -1.0f, 0.0f), // bottom left
-			},
-			new Vector2[] {
-				new Vector2(0.0f, 0.0f), // bottom left
-				new Vector2(0.0f, 1.0f), // top left
-				new Vector2(1.0f, 1.0f), // top right
-
-				new Vector2(1.0f, 1.0f), // top right
-				new Vector2(1.0f, 0.0f), // bottom right
-				new Vector2(0.0f, 0.0f), // bottom left
-			}*/);
-		m.setPosition(0.0f, 0.0f, 5.0f);
+			mres);
+		m.setPosition(0.0f, 0.0f, 3.0f);
 		m_panel.addMesh(m);
 		float start = System.nanoTime() * 1E-9f;
 
@@ -114,6 +64,6 @@ public class SoftwareRenderer extends JFrame {
 		}
 	}
 
-	public static void main(String[] args) { new SoftwareRenderer(1280, 720); }
+	public static void main(String[] args) { new SoftwareRenderer(640, 480); }
 
 }
