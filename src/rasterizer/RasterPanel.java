@@ -14,46 +14,91 @@ import java.io.File;
 import rasterizer.Vector2;
 import rasterizer.Mesh;
 
+/**
+ * Raster panel, responsible for all rasterization/drawing to screen.
+ */
 public class RasterPanel extends JPanel {
+	// Back buffers for rendering to/drawing from.
 	private BufferedImage m_backBuffer;
-	private float[][] m_depthBuffer;
+	private volatile float[][] m_depthBuffer;
+
+	// Texture array (for sampler textuers).
 	BufferedImage m_textures[];
+	// Mesh array.
 	Mesh m_meshes[];
+
+	// Current mesh index.
 	private int m_meshIndex = 0;
+
+	// Screen dimensions.
 	private int m_screenWidth;
 	private int m_screenHeight;
+
+	// Current update listener.
 	IUpdateListener m_listener;
 
+	// Resolution divisor (for low-res upscaling, improves FPS).
 	final int m_RESDIVISOR = 3;
 
-	float lerp(float a, float b, float alpha) {
+	/**
+	 * Linearly interpolates between two floats given an alpha value.
+	 * @param a The first value.
+	 * @param b The second value.
+	 * @param alpha The amount to blend the first and second values.
+	 * @return Some value where a <= retval <= b given a < b.
+	 */
+	private float lerp(float a, float b, float alpha) {
+		// Linear interpolation equation. Lower alpha means bigger weight
+		// on A (alpha * a), 
+		// while higher alpha menas bigger weight on B (alpha * b).
 		return (1.0f - alpha) * a + alpha * b;
 	}
 
-	Color lerpColor(Color a, Color b, float alpha) {
+	/**
+	 * Linearly interpolates between two colors given an alpha value.
+	 * @param a The first color.
+	 * @param b The second color.
+	 * @param alpha The amount to blend the first and second colors.
+	 * @return A new color representing A blended with B.
+	 */
+	private Color lerpColor(Color a, Color b, float alpha) {
+		// Blend colors using lerp method.
 		return new Color(
-		Math.round(lerp((float) a.getRed(), (float) b.getRed(), alpha)),
-		Math.round(
-			lerp((float) a.getGreen(), (float) b.getGreen(), alpha)),
-		Math.round(
-			lerp((float) a.getBlue(), (float) b.getBlue(), alpha)));
+			Math.round(
+				lerp((float) a.getRed(), (float) b.getRed(), alpha)),
+			Math.round(
+				lerp((float) a.getGreen(), (float) b.getGreen(), alpha)),
+			Math.round(
+				lerp((float) a.getBlue(), (float) b.getBlue(), alpha)));
 
 	}
 
-	float pointDist(Point a, Point b) {
-		return (float) Math.sqrt(
-			Math.pow(b.x - a.x, 2) +
-			Math.pow(b.y - a.y, 2));
-	}
-
-	float clamp(float x, float min, float max) {
+	/**
+	 * Clamps value between range.
+	 * @param x The value to clamp.
+	 * @param min The minimum value in the range.
+	 * @param max The maximum value in the range.
+	 * @return The clamped value.
+	 */
+	private float clamp(float x, float min, float max) {
+		// If X is greater than the maximum, return the maximum, if X is lower
+		// than the minimum, return the minimum, else return X.
 		if (x > max) return max;
 		if (x < min) return min;
 		return x;
 	}
 
-	Color sampleImage(BufferedImage image, float x, float y) {
+	/**
+	 * Sample a texture given X/Y coordinate in range [0, 1].
+	 * @param image The image to sample.
+	 * @param x The X texture coordinate.
+	 * @param y The Y texture coordinate.
+	 * @return The color sampled from the image at the X/Y pair.
+	 */
+	private Color sampleImage(BufferedImage image, float x, float y) {
+		// If the image is undefined return pure black.
 		if (image == null) return Color.BLACK;
+		// X and  positions are rounded, then clamped within the image borders.
 		int xpos =
 			(int) clamp(
 				(int) Math.ceil(x * image.getWidth()),
@@ -62,20 +107,41 @@ public class RasterPanel extends JPanel {
 			(int) clamp(
 				(int) Math.ceil(y * image.getHeight()),
 				0, image.getHeight() - 1);
+		// Return the color as sampled from the computed coordinates.
 		return new Color(image.getRGB(xpos, image.getHeight() - ypos - 1));
 	}
 
+	/**
+	 * Read a texture from the disk and assign it to an index.
+	 * @param id The ID/index to assign the texture to.
+	 * @param path The path of the image to load.
+	 */
 	public void addTexture(Integer id, String path) {
+		// Attempt to read the image from the disk.
 		try {
 			BufferedImage img = ImageIO.read(new File(path));
+			// Assign the texture to the ID.
 			m_textures[id] = img;
 		} catch (IOException e) {
+			// Print stack trace if an exception is thrown.
 			e.printStackTrace();
 		}
 	}
 
-	void fillTriangle(
-		int     id,
+	/**
+	 * The meat of the rasterizer, handles filling triangles.
+	 * @param id The ID of the texture to sample.
+	 * @param model The model matrix (transformation).
+	 * @param proj The projection matrix (world->screen)
+	 * @param va The first vertex.
+	 * @param vb The second vertex.
+	 * @param vc The third vertex.
+	 * @param ta The first texture coordinate.
+	 * @param tb The second texture coordinate.
+	 * @param tc The third texture coordinate.
+	 */
+	synchronized void fillTriangle(
+		int id,
 		Matrix4 model,
 		Matrix4 proj,
 		Vector3 va,
@@ -84,67 +150,111 @@ public class RasterPanel extends JPanel {
 		Vector2 ta,
 		Vector2 tb,
 		Vector2 tc) {
-
+		// Get the texture at the given ID.
 		BufferedImage tex = m_textures[id];
-
+		// Compute model-projection transform.
 		Matrix4 mp = proj.mult(model);
 
+		// First blend variable (between vert/texcoord a and b).
 		float alphaX;
+		// Interpolated vertices.
 		Vector3 ia;
 		Vector3 ib;
+		// Interpolated texture coordinates.
 		Vector2 ita;
 		Vector2 itb;
 
+		// Define the position of the point light in the scene.
 		Vector3 lightPos = new Vector3(0.0f, 1.0f, 2.0f);
 
+		// Define the aspect ratio of the screen.
 		final float ASPECT = (float) m_screenWidth / (float) m_screenHeight;
 
+		// Compute the number of X and Y interpolation iterations to perform
+		// based on the screen resolution and aspect ratio.
 		final int ITER_X = Math.round(m_screenWidth * ASPECT);
 		final int ITER_Y = Math.round(m_screenHeight / ASPECT);
+		// Compute the inverses of the X and Y iterations to multiply to map
+		// the iteration counter to the range [0, 1].
 		final float ITER_X_INV = 1.0f / ITER_X;
 		final float ITER_Y_INV = 1.0f / ITER_Y;
 
+		// Perform X iterations (from 0 to ITER_X).
 		for (int i = 0; i < ITER_X; ++i) {
+			// Set first blend variable to the iteration counter mapped to
+			// the range [0, 1] using ITER_X_INV.
 			alphaX = (float) i * ITER_X_INV;
+
+			// Interpolate between first and second vertex.
 			ia = va.lerp(vb, alphaX);
+			// Interpolate first and third vertex.
 			ib = va.lerp(vc, alphaX);
+			// Interpolate between first and second texture coordinate.
 			ita = ta.lerp(tb, alphaX);
+			// Interpolate between first and third texture coordinate.
 			itb = ta.lerp(tc, alphaX);
 
+			// Second interpolation alpha.
 			float alphaY;
+			// Second interpolation vertex.
 			Vector3 ic;
+			// Screen-space coordinate.
 			Vector3 ssc;
+			// Interpolated texture coordinate.
 			Vector2 it;
 
+			// Perform Y iterations (from 0 to ITER_Y).
 			for (int i2 = 0; i2 < ITER_Y; ++i2) {
+				// Set second blend variable to the iteration counter mapped to
+				// the range [0, 1] using ITER_Y_INV.
 				alphaY = (float) i2 * ITER_Y_INV;
+				// Interpolate between the first interpolated variable and the
+				// second interpolated variable.
 				ic = ia.lerp(ib, alphaY);
+				// Compute screen-space coordinate by multiplying the
+				// world-space coordinate by the model-projection matrix.
 				ssc = mp.mult(new Vector4(ic, 1.0f)).wdivide();
-				it = ita.lerp(itb, alphaY);
 
-				Vector3 world = model.mult(new Vector4(ic, 1.0f)).wdivide();
-				Color color = sampleImage(tex, it.x, it.y);
-
-				float dist = (float) Math.pow(world.distance(lightPos), 2.0f);
-				color =
-					lerpColor(
-						Color.BLACK,
-						color,
-						clamp((1.0f / (1.0f + dist)), 0.0f, 1.0f));
-
+				// Calculate the screen coordinates to draw the pixel to.
 				int dcoordX =
 					(int) clamp(
+						// Map [-1, 1] to [0, 1].
 						(ssc.x + 1.0f) * 0.5f * m_screenWidth,
 						0.0f,
 						(float) m_screenWidth - 1);
 				int dcoordY =
 					(int) clamp(
+						// Map [-1, 1] to [0, 1]
 						(ssc.y + 1.0f) * 0.5f * m_screenHeight,
 						0.0f,
 						(float) m_screenHeight - 1);
 
+				// Perform depth test to prevent drawing occluded fragments.
 				if (ssc.z < m_depthBuffer[dcoordX][dcoordY]) {
+					// Compute texture coordinate by blending first interpolated
+					// coordinate with second interpolated coordinate.
+					it = ita.lerp(itb, alphaY);
+					// Compute world-space position for lighting calculations.
+					Vector3 world = model.mult(new Vector4(ic, 1.0f)).wdivide();
+					// Sample texture using texture coordinate.
+					Color color = sampleImage(tex, it.x, it.y);
+
+					// Compute the inverse square attenuation factor on the light.
+					float atten = 
+						1.0f 
+						/ (1.0f 
+							+ (float) Math.pow(world.distance(lightPos), 2.0f));
+					// Apply attenuation by blending sampled color with black using
+					// the attenuation factor as the alpha.
+					color =
+						lerpColor(
+							Color.BLACK,
+							color,
+							clamp(atten, 0.0f, 1.0f));
+
+					// Write screen-space depth value to depth buffer.
 					m_depthBuffer[dcoordX][dcoordY] = ssc.z;
+					// Write color to backbuffer.
 					m_backBuffer.setRGB(
 						(int) dcoordX,
 						(int) m_screenHeight - dcoordY - 1,
@@ -154,15 +264,35 @@ public class RasterPanel extends JPanel {
 		}
 	}
 
-	float m_last           = 0.0f;
-	float m_elapsed        = 0.0f;
-	float m_fpsAccumulator = 0.0f;
-	int   m_frames         = 0;
+	/*
+	 * General timing variables.
+	 */
 
+	// Last chrono time.
+	float m_last = 0.0f;
+	// Current elapsed time.
+	float m_elapsed = 0.0f;
+
+	/*
+	 * FPS profiling variables.
+	 */
+
+	// FPS time accumulator.
+	float m_fpsAccumulator = 0.0f;
+	// Number of frames drawn.
+	int   m_frames = 0;
+
+	/**
+	 * Overriden JPanel paintComponent, for drawing the rasterized scene.
+	 * @param g The graphics object to draw to.
+	 */
 	@Override
 	public void paintComponent(Graphics g) {
+		// Get the graphics object from the BufferedImage back buffer.
 		Graphics ig = m_backBuffer.getGraphics();
 
+		// Compute projection matrix from screen width/height and fixed FOV
+		// and near/far planes.
 		Matrix4 proj =
 			Matrix4.perspective(
 				(float) m_backBuffer.getWidth()
@@ -171,20 +301,34 @@ public class RasterPanel extends JPanel {
 				0.01f,
 				100.0f);
 
+		// Create pool for render threads.
 		ArrayList<Thread> threadPool = new ArrayList<Thread>();
 
+		// Define triangle sum to be displayed as debug info.
+		int triangleSum = 0;
+
+		// Iterate through meshes in scene.
 		for (int i = 0; i < m_meshIndex; ++i) {
+			// Get mesh from index.
 			Mesh m = m_meshes[i];
+			// Add polycount.
+			triangleSum += m.getTriCount();
+
+			// Get the verts of the mesh.
 			Vector3[] verts = m.getVerts();
 
+			// Loop through every three verts (every triangle).
 			for (int v = 0; v < m.getTriCount() * 3; v += 3) {
+				// Store verts/coords so they are visible to the thread lambda.
 				Vector3 vert0 = m.getVerts()[v + 0];
 				Vector3 vert1 = m.getVerts()[v + 1];
 				Vector3 vert2 = m.getVerts()[v + 2];
 				Vector2 coord0 = m.getCoords()[v + 0];
 				Vector2 coord1 = m.getCoords()[v + 1];
 				Vector2 coord2 = m.getCoords()[v + 2];
+				// Create a render thread to draw the triangle.
 				Thread t = new Thread(() -> {
+					// Fill triangle with texture/verts/coords/matrices.
 					fillTriangle(
 						m.getTextureID(),
 						m.getTransformMatrix(),
@@ -196,19 +340,26 @@ public class RasterPanel extends JPanel {
 						coord1,
 						coord2);
 				});
-				t.start();
+				// Add the thread to the render thread pool.
 				threadPool.add(t);
 			}
 		}
 
+		// Start every thread.
+		for (Thread t : threadPool) { t.start(); }
+
+		// Wait for all threads to finish.
 		for (Thread t : threadPool) {
 			try {
+				// Join the thread.
 				t.join();
 			} catch (InterruptedException e) {
+				// Print stack trace if an exception is thrown.
 				e.printStackTrace();
 			}
 		}
 
+		// Draw the backbuffer to the screen.
 		g.drawImage(
 			m_backBuffer,
 			0,
@@ -216,45 +367,72 @@ public class RasterPanel extends JPanel {
 			m_screenWidth * m_RESDIVISOR,
 			m_screenHeight * m_RESDIVISOR,
 			null);
+		// Set the text color to draw the debug info.
+		g.setColor(Color.WHITE);
+		// Draw polycount to screen.
+		g.drawString("POLYCOUNT: " + triangleSum, 32, 32);
+		// Clear the backbuffer.
 		ig.clearRect(0, 0, m_screenWidth, m_screenHeight);
+		// Fill depth buffer with 100% depth.
 		for (int x = 0; x < m_screenWidth; ++x) {
 			for (int y = 0; y < m_screenHeight; ++y) {
 				m_depthBuffer[x][y] = 1.0f;
 			}
 		}
 
+		// Compute delta time/elapsed time.
 		float now = System.nanoTime() * 1E-9f;
 		float delta = now - m_last;
 		m_elapsed += delta;
 		m_last = now;
 
+		// Add delta time to FPS accumulator and increment frame counter.
 		m_fpsAccumulator += delta;
 		++m_frames;
+		// Print frame count to console if FPS accumulator goes over 1 second.
 		if (m_fpsAccumulator > 1.0f) {
-			System.out.println(m_frames);
+			System.out.println("FPS: " + m_frames);
+			// Reset FPS accumulators.
 			m_frames = 0;
 			m_fpsAccumulator = 0.0f;
 		}
 
+		// Update listener if non-null.
 		if (m_listener != null) {
 			m_listener.update(delta);
 		}
 	}
 
+	/**
+	 * Set the update listener to notify once per update.
+	 * @param listener The listener to assign.
+	 */
 	public void setUpdateListener(IUpdateListener listener) {
 		m_listener = listener;
 	}
 
+	/**
+	 * Add a mesh to the render array.
+	 * @param m The mesh to add.
+	 */
 	public void addMesh(Mesh m) {
 		m_meshes[m_meshIndex++] = m;
 	}
 
+	/**
+	 * Cnstruct a render panel given a width/height.
+	 * @param width The width of the render target in pixels.
+	 * @param height The height of the render target in pixels.
+	 */
 	RasterPanel(int width, int height) {
+		// Initialize back buffer.
 		m_backBuffer = new BufferedImage(
 			width / m_RESDIVISOR,
 			height / m_RESDIVISOR,
 			BufferedImage.TYPE_INT_RGB);
+		// Initialize depth buffer.
 		m_depthBuffer = new float[width / m_RESDIVISOR][height / m_RESDIVISOR];
+		// Initialize state.
 		m_textures = new BufferedImage[32];
 		m_meshes = new Mesh[32];
 		m_screenWidth = width / m_RESDIVISOR;
