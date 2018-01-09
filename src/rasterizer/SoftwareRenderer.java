@@ -68,7 +68,6 @@ public class SoftwareRenderer extends JFrame {
 
 		// Set window content pane to render panel.
 		this.setContentPane(m_panel);
-		this.setVisible(true);
 
 		// Set up scene.
 		m_panel.addTexture(0, "difmap.png");
@@ -106,13 +105,17 @@ public class SoftwareRenderer extends JFrame {
 			}
 		});
 
+
+		// Start indefinite repaint thread.
+		// Will be killed at window exit.
 		new Thread(() -> { for (;;) { m_panel.repaint(); } }).start();
+		this.setVisible(true);
 	}
 
 	/**
 	 * Main method. Creates an instance of the renderer with the window size.
 	 * @param args The command-line arguments passed in by the OS.
 	 */
-	public static void main(String[] args) { new SoftwareRenderer(640, 480); }
+	public static void main(String[] args) { new SoftwareRenderer(1280, 720); }
 
 }

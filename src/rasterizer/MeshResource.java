@@ -46,10 +46,9 @@ public class MeshResource {
             try {
                 line = freader.readLine();
             } catch (IOException e) {
-                // Print stack trace and continue to next line if an exception
-                // occurred.
+                // Print stack trace and break if an exception occurred.
                 e.printStackTrace();
-                continue;
+                break;
             }
 
             // Break if the line is null, as that marks the EoF.
