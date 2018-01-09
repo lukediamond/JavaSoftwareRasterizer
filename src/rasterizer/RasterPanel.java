@@ -38,7 +38,7 @@ public class RasterPanel extends JPanel {
 	IUpdateListener m_listener;
 
 	// Resolution divisor (for low-res upscaling, improves FPS).
-	final int m_RESDIVISOR = 3;
+	final int m_RESDIVISOR = 4;
 
 	/**
 	 * Linearly interpolates between two floats given an alpha value.
@@ -212,7 +212,8 @@ public class RasterPanel extends JPanel {
 				// second interpolated variable.
 				ic = ia.lerp(ib, alphaY);
 				// Compute screen-space coordinate by multiplying the
-				// world-space coordinate by the model-projection matrix.
+				// world-space coordinate by the model-projection matrix, then
+				// divide by w to make it a 3-dimensional vector.
 				ssc = mp.mult(new Vector4(ic, 1.0f)).wdivide();
 
 				// Calculate the screen coordinates to draw the pixel to.
@@ -250,7 +251,7 @@ public class RasterPanel extends JPanel {
 						lerpColor(
 							Color.BLACK,
 							color,
-							clamp(atten, 0.0f, 1.0f));
+							clamp(atten * 2.0f, 0.0f, 1.0f));
 
 					// Write screen-space depth value to depth buffer.
 					m_depthBuffer[dcoordX][dcoordY] = ssc.z;

@@ -72,16 +72,24 @@ public class SoftwareRenderer extends JFrame {
 
 		// Set up scene.
 		m_panel.addTexture(0, "difmap.png");
+		m_panel.addTexture(1, "floor.png");
 
 		// Load mesh from file.
-		MeshResource mres = new MeshResource("untitled.obj");
-		Mesh m = new Mesh(
-			0,
-			mres);
-		m.setPosition(0.0f, 0.0f, 3.0f);
+		MeshResource cuberes = new MeshResource("cube.obj");
+		Mesh cube = new Mesh(0, cuberes);
+		cube.setPosition(0.0f, 0.0f, 3.0f);
 
-		// Add mesh to panel.
-		m_panel.addMesh(m);
+		// Load floor from file
+		MeshResource floorres = new MeshResource("plane.obj");
+		Mesh floor = new Mesh(1, floorres);
+
+		floor.setPosition(0.0f, -1.5f, 3.0f);
+		floor.setRotation(90.0f, 0.0f, 0.0f);
+		floor.setScale(2.0f, 2.0f, 0.0f);
+
+		// Add meshs to panel.
+		m_panel.addMesh(cube);
+		m_panel.addMesh(floor);
 
 		// Set update listener for moving the mesh.
 		m_panel.setUpdateListener(new IUpdateListener() {
@@ -94,14 +102,11 @@ public class SoftwareRenderer extends JFrame {
 			@Override
 			public void update(float delta) {
 				elapsed += delta;
-				m.setRotation(45.0f, 90.0f * elapsed, 0.0f);
+				cube.setRotation(45.0f, 90.0f * elapsed, 45.0f * elapsed);
 			}
 		});
 
-		// Repaint/update/render indefinitely.
-		for (;;) {
-			m_panel.repaint();
-		}
+		new Thread(() -> { for (;;) { m_panel.repaint(); } }).start();
 	}
 
 	/**
