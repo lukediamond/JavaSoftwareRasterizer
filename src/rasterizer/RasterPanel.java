@@ -29,6 +29,10 @@ public class RasterPanel extends JPanel {
 	private volatile ArrayDeque<DrawAction> m_drawQueue;
 	private volatile int m_drawCount = 0;
 
+	// Camera state.
+	private Vector3 m_cameraPosition;
+	private Vector3 m_cameraRotation;
+
 	// Texture array (for sampler textuers).
 	BufferedImage m_textures[];
 	// Mesh array.
@@ -45,7 +49,7 @@ public class RasterPanel extends JPanel {
 	IUpdateListener m_listener;
 
 	// Resolution divisor (for low-res upscaling, improves FPS).
-	final int m_RESDIVISOR = 2;
+	final int m_RESDIVISOR = 4;
 
 	/**
 	 * Linearly interpolates between two floats given an alpha value.
@@ -150,8 +154,8 @@ public class RasterPanel extends JPanel {
 	private synchronized void fillTriangle(DrawAction action) {
 		// Get the texture at the given ID.
 		BufferedImage tex = m_textures[action.tex];
-		// Compute model-projection transform.
-		Matrix4 mp = action.proj.mult(action.model);
+		// Compute model-view-projection matrix.
+		Matrix4 mvp = action.proj.mult(action.view).mult(action.model);
 
 		// First blend variable (between vert/texcoord a and b).
 		float alphaX;
@@ -163,7 +167,7 @@ public class RasterPanel extends JPanel {
 		Vector2 itb;
 
 		// Define the position of the point light in the scene.
-		Vector3 lightPos = new Vector3(0.0f, 1.0f, 2.0f);
+		Vector3 lightPos = new Vector3(0.0f, 1.0f, 4.0f);
 		Color lightColor = new Color(128, 128, 255);
 
 
@@ -210,7 +214,7 @@ public class RasterPanel extends JPanel {
 				// Compute screen-space coordinate by multiplying the
 				// world-space coordinate by the model-projection matrix, then
 				// divide by w to make it a 3-dimensional vector.
-				ssc = mp.mult(new Vector4(ic, 1.0f)).wdivide();
+				ssc = mvp.mult(new Vector4(ic, 1.0f)).wdivide();
 
 				// Calculate the screen coordinates to draw the pixel to.
 				int dcoordX =
@@ -237,16 +241,20 @@ public class RasterPanel extends JPanel {
 					// Sample texture using texture coordinate.
 					Color color = sampleImage(tex, it.x, it.y);
 
-					// Compute the inverse square attenuation factor on the light.
+					// Compute the inverse square attenuation 
+					// factor on the light.
 					float atten = 
 						1.0f 
 						/ (1.0f 
 							+ (float) Math.pow(world.distance(lightPos), 2.0f));
-					// Apply attenuation by blending sampled color with black using
-					// the attenuation factor as the alpha.
+					// Apply attenuation by blending sampled color
+					// with black using the attenuation factor as the alpha.
 					color =
 						lerpColor(
-							lerpColor(Color.BLACK, color, (float) Math.pow(atten, 0.5f)),
+							lerpColor(
+								Color.BLACK, 
+								color, 
+								(float) Math.pow(atten, 0.5f)),
 							lightColor,
 							clamp(atten * 1.0f, 0.0f, 1.0f));
 
@@ -295,9 +303,14 @@ public class RasterPanel extends JPanel {
 			Matrix4.perspective(
 				(float) m_backBuffer.getWidth()
 				/ (float) m_backBuffer.getHeight(),
-				90.0f,
+				45.0f,
 				0.01f,
 				10.0f);
+		Matrix4 view = 
+			Matrix4.transform(
+				m_cameraPosition.mult(-1.0f), 
+				m_cameraRotation.mult(-1.0f), 
+				Vector3.ONE);
 
 		// Create pool for render threads.
 		ArrayList<Thread> threadPool = new ArrayList<Thread>();
@@ -323,6 +336,7 @@ public class RasterPanel extends JPanel {
 						new DrawAction(
 							m.getTextureID(), 
 							m.getTransformMatrix(), 
+							view,
 							proj,
 							m.getVerts()[v + 0], 
 							m.getVerts()[v + 1], 
@@ -391,6 +405,38 @@ public class RasterPanel extends JPanel {
 	}
 
 	/**
+	 * Set the position of the camera in the world.
+	 * @param pos The new position to use.
+	 */
+	public void setCameraPosition(Vector3 pos) {
+		m_cameraPosition = pos;
+	}
+
+	/**
+	 * Get the position of the camera in the world.
+	 * @return The camera position vector.
+	 */
+	public Vector3 getCameraPosition() {
+		return m_cameraPosition;
+	}
+
+	/**
+	 * Set the rotation of the camera.
+	 * @param rot The new rotation to use for the camera.
+	 */
+	public void setCameraRotation(Vector3 rot) {
+		m_cameraRotation = rot;
+	}
+
+	/**
+	 * Get the rotation of the camera in degrees.
+	 * @return The camera's rotation as a 3-dimensional vector of angles.
+	 */
+	public Vector3 getCameraRotation() {
+		return m_cameraRotation;
+	}
+
+	/**
 	 * Add a mesh to the render array.
 	 * @param m The mesh to add.
 	 */
@@ -449,6 +495,9 @@ public class RasterPanel extends JPanel {
 		m_meshes = new Mesh[32];
 		m_screenWidth = width / m_RESDIVISOR;
 		m_screenHeight = height / m_RESDIVISOR;
+		// Initialize camera.
+		m_cameraPosition = Vector3.ZERO;
+		m_cameraRotation = Vector3.ZERO;
 	}
 
 }

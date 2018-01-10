@@ -76,19 +76,22 @@ public class SoftwareRenderer extends JFrame {
 		// Load mesh from file.
 		MeshResource cuberes = new MeshResource("cube.obj");
 		Mesh cube = new Mesh(0, cuberes);
-		cube.setPosition(0.0f, 0.0f, 3.0f);
+		cube.setPosition(0.0f, 0.0f, 6.0f);
 
 		// Load floor from file
 		MeshResource floorres = new MeshResource("plane.obj");
 		Mesh floor = new Mesh(1, floorres);
 
-		floor.setPosition(0.0f, -1.5f, 3.0f);
+		floor.setPosition(0.0f, -1.5f, 6.0f);
 		floor.setRotation(90.0f, 0.0f, 0.0f);
 		floor.setScale(2.0f, 2.0f, 0.0f);
 
 		// Add meshs to panel.
 		m_panel.addMesh(cube);
 		m_panel.addMesh(floor);
+
+		m_panel.setCameraPosition(new Vector3(0.0f, 4.0f, -2.0f));
+		m_panel.setCameraRotation(new Vector3(45.0f, 0.0f, 0.0f));
 
 		// Set update listener for moving the mesh.
 		m_panel.setUpdateListener(new IUpdateListener() {
@@ -108,8 +111,8 @@ public class SoftwareRenderer extends JFrame {
 
 		// Start indefinite repaint thread.
 		// Will be killed at window exit.
-		new Thread(() -> { for (;;) { m_panel.repaint(); } }).start();
 		this.setVisible(true);
+		new Thread(() -> { for (;;) { m_panel.repaint(); } }).start();
 	}
 
 	/**

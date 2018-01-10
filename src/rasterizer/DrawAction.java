@@ -2,8 +2,9 @@ package rasterizer;
 
 class DrawAction {
 	public int tex;
-	public Matrix4 proj;
 	public Matrix4 model;
+	public Matrix4 view;
+	public Matrix4 proj;
 	public Vector3 va;
 	public Vector3 vb;
 	public Vector3 vc;
@@ -14,6 +15,7 @@ class DrawAction {
 	public DrawAction(
 		int tex_, 
 		Matrix4 model_, 
+		Matrix4 view_,
 		Matrix4 proj_, 
 		Vector3 va_, 
 		Vector3 vb_, 
@@ -22,8 +24,9 @@ class DrawAction {
 		Vector2 tb_, 
 		Vector2 tc_) {
 		tex = tex_;
-		proj = proj_;
 		model = model_;
+		view = view_;
+		proj = proj_;
 		va = va_;
 		vb = vb_;
 		vc = vc_;

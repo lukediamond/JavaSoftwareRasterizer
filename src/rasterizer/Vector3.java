@@ -9,6 +9,9 @@ public class Vector3 {
 	public float y;
 	public float z;
 
+	public static final Vector3 ZERO = new Vector3(0.0f, 0.0f, 0.0f);
+	public static final Vector3 ONE = new Vector3(1.0f, 1.0f, 1.0f);
+
 	/**
 	 * Constructs a 3-dimensional vector from a x/y/z triplet.
 	 * @param x_ The initial x coordinate.
@@ -107,6 +110,16 @@ public class Vector3 {
 	public Vector3 mult(Vector3 other) {
 		// Multiply channels of this with corresponding channels of other.
 		return new Vector3(x * other.x, y * other.y, z * other.z);
+	}
+
+	/**
+	 * Compute the product of the current vector and some scalar.
+	 * @param scl The scalar to compute the product with.
+	 * @return The product of this and scl.
+	 */
+	public Vector3 mult(float scl) {
+		// Multiply channels of this with scalar.
+		return new Vector3(x * scl, y * scl, z * scl);
 	}
 
 	/**
