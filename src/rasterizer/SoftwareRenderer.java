@@ -116,6 +116,6 @@ public class SoftwareRenderer extends JFrame {
 	 * Main method. Creates an instance of the renderer with the window size.
 	 * @param args The command-line arguments passed in by the OS.
 	 */
-	public static void main(String[] args) { new SoftwareRenderer(1280, 720); }
+	public static void main(String[] args) { new SoftwareRenderer(640, 480); }
 
 }

@@ -78,11 +78,12 @@ public class Vector3 {
 	 * @return A new vector between this and other based on some factor a.
 	 */
 	public Vector3 lerp(Vector3 other, float a) {
+		float ia = 1.0f - a;
 		// Interpolate vector channels.
 		return new Vector3(
-			(1.0f - a) * x + a * other.x,
-			(1.0f - a) * y + a * other.y,
-			(1.0f - a) * z + a * other.z);
+			ia * x + a * other.x,
+			ia * y + a * other.y,
+			ia * z + a * other.z);
 	}
 
 	/**

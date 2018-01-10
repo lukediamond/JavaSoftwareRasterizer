@@ -8,6 +8,7 @@ import javax.swing.JPanel;
 import java.awt.Point;
 import java.util.HashMap;
 import java.util.ArrayList;
+import java.util.ArrayDeque;
 import java.io.IOException;
 import java.io.File;
 
@@ -19,8 +20,14 @@ import rasterizer.Mesh;
  */
 public class RasterPanel extends JPanel {
 	// Back buffers for rendering to/drawing from.
-	private BufferedImage m_backBuffer;
+	private volatile BufferedImage m_backBuffer;
 	private volatile float[][] m_depthBuffer;
+
+	// Render thread state.
+	private Thread[] m_renderThreads;
+	private int m_threadCount;
+	private volatile ArrayDeque<DrawAction> m_drawQueue;
+	private volatile int m_drawCount = 0;
 
 	// Texture array (for sampler textuers).
 	BufferedImage m_textures[];
@@ -38,7 +45,7 @@ public class RasterPanel extends JPanel {
 	IUpdateListener m_listener;
 
 	// Resolution divisor (for low-res upscaling, improves FPS).
-	final int m_RESDIVISOR = 4;
+	final int m_RESDIVISOR = 2;
 
 	/**
 	 * Linearly interpolates between two floats given an alpha value.
@@ -140,20 +147,11 @@ public class RasterPanel extends JPanel {
 	 * @param tb The second texture coordinate.
 	 * @param tc The third texture coordinate.
 	 */
-	synchronized void fillTriangle(
-		int id,
-		Matrix4 model,
-		Matrix4 proj,
-		Vector3 va,
-		Vector3 vb,
-		Vector3 vc,
-		Vector2 ta,
-		Vector2 tb,
-		Vector2 tc) {
+	private synchronized void fillTriangle(DrawAction action) {
 		// Get the texture at the given ID.
-		BufferedImage tex = m_textures[id];
+		BufferedImage tex = m_textures[action.tex];
 		// Compute model-projection transform.
-		Matrix4 mp = proj.mult(model);
+		Matrix4 mp = action.proj.mult(action.model);
 
 		// First blend variable (between vert/texcoord a and b).
 		float alphaX;
@@ -166,15 +164,12 @@ public class RasterPanel extends JPanel {
 
 		// Define the position of the point light in the scene.
 		Vector3 lightPos = new Vector3(0.0f, 1.0f, 2.0f);
-		Color lightColor = new Color(128, 0, 0);
+		Color lightColor = new Color(128, 128, 255);
 
-		// Define the aspect ratio of the screen.
-		final float ASPECT = (float) m_screenWidth / (float) m_screenHeight;
 
-		// Compute the number of X and Y interpolation iterations to perform
-		// based on the screen resolution and aspect ratio.
-		final int ITER_X = Math.round(m_screenWidth * ASPECT);
-		final int ITER_Y = Math.round(m_screenHeight / ASPECT);
+		// Compute the number of X and Y interpolation iterations to perform.
+		final int ITER_X = m_screenWidth;
+		final int ITER_Y = m_screenHeight;
 		// Compute the inverses of the X and Y iterations to multiply to map
 		// the iteration counter to the range [0, 1].
 		final float ITER_X_INV = 1.0f / ITER_X;
@@ -187,13 +182,13 @@ public class RasterPanel extends JPanel {
 			alphaX = (float) i * ITER_X_INV;
 
 			// Interpolate between first and second vertex.
-			ia = va.lerp(vb, alphaX);
+			ia = action.va.lerp(action.vb, alphaX);
 			// Interpolate first and third vertex.
-			ib = va.lerp(vc, alphaX);
+			ib = action.va.lerp(action.vc, alphaX);
 			// Interpolate between first and second texture coordinate.
-			ita = ta.lerp(tb, alphaX);
+			ita = action.ta.lerp(action.tb, alphaX);
 			// Interpolate between first and third texture coordinate.
-			itb = ta.lerp(tc, alphaX);
+			itb = action.ta.lerp(action.tc, alphaX);
 
 			// Second interpolation alpha.
 			float alphaY;
@@ -232,12 +227,13 @@ public class RasterPanel extends JPanel {
 						(float) m_screenHeight - 1);
 
 				// Perform depth test to prevent drawing occluded fragments.
-				if (ssc.z == 1.0f || ssc.z < m_depthBuffer[dcoordX][dcoordY]) {
+				if (ssc.z < m_depthBuffer[dcoordX][dcoordY]) {
 					// Compute texture coordinate by blending first interpolated
 					// coordinate with second interpolated coordinate.
 					it = ita.lerp(itb, alphaY);
 					// Compute world-space position for lighting calculations.
-					Vector3 world = model.mult(new Vector4(ic, 1.0f)).wdivide();
+					Vector3 world = 
+						action.model.mult(new Vector4(ic, 1.0f)).wdivide();
 					// Sample texture using texture coordinate.
 					Color color = sampleImage(tex, it.x, it.y);
 
@@ -259,10 +255,6 @@ public class RasterPanel extends JPanel {
 					// Write color to backbuffer.
 					m_backBuffer.setRGB(
 						(int) dcoordX,
-						(int) m_screenHeight - dcoordY - 1,
-						color.getRGB());
-					m_backBuffer.setRGB(
-						(int) clamp(dcoordX - 1, 0, m_screenWidth - 1),
 						(int) m_screenHeight - dcoordY - 1,
 						color.getRGB());
 				}
@@ -325,45 +317,26 @@ public class RasterPanel extends JPanel {
 
 			// Loop through every three verts (every triangle).
 			for (int v = 0; v < m.getTriCount() * 3; v += 3) {
-				// Store verts/coords so they are visible to the thread lambda.
-				Vector3 vert0 = m.getVerts()[v + 0];
-				Vector3 vert1 = m.getVerts()[v + 1];
-				Vector3 vert2 = m.getVerts()[v + 2];
-				Vector2 coord0 = m.getCoords()[v + 0];
-				Vector2 coord1 = m.getCoords()[v + 1];
-				Vector2 coord2 = m.getCoords()[v + 2];
-				// Create a render thread to draw the triangle.
-				Thread t = new Thread(() -> {
-					// Fill triangle with texture/verts/coords/matrices.
-					fillTriangle(
-						m.getTextureID(),
-						m.getTransformMatrix(),
-						proj,
-						vert0,
-						vert1,
-						vert2,
-						coord0,
-						coord1,
-						coord2);
-				});
-				// Add the thread to the render thread pool.
-				threadPool.add(t);
+				// Enqueue draw action.
+				synchronized (m_drawQueue) {
+					m_drawQueue.add(
+						new DrawAction(
+							m.getTextureID(), 
+							m.getTransformMatrix(), 
+							proj,
+							m.getVerts()[v + 0], 
+							m.getVerts()[v + 1], 
+							m.getVerts()[v + 2], 
+							m.getCoords()[v + 0], 
+							m.getCoords()[v + 1], 
+							m.getCoords()[v + 2]));
+				}
 			}
 		}
 
-		// Start every thread.
-		for (Thread t : threadPool) { t.start(); }
-
-		// Wait for all threads to finish.
-		for (Thread t : threadPool) {
-			try {
-				// Join the thread.
-				t.join();
-			} catch (InterruptedException e) {
-				// Print stack trace if an exception is thrown.
-				e.printStackTrace();
-			}
+		while (m_drawCount < triangleSum) {
 		}
+		m_drawCount = 0;
 
 		// Draw the backbuffer to the screen.
 		g.drawImage(
@@ -438,6 +411,39 @@ public class RasterPanel extends JPanel {
 			BufferedImage.TYPE_INT_RGB);
 		// Initialize depth buffer.
 		m_depthBuffer = new float[width / m_RESDIVISOR][height / m_RESDIVISOR];
+		// Initialize threads.
+
+		// Use ones less thread than the number of available CPU cores.
+		m_threadCount = Runtime.getRuntime().availableProcessors() - 1;
+		m_renderThreads = new Thread[m_threadCount];
+		m_drawQueue = new ArrayDeque<DrawAction>();
+		for (int i = 0; i < m_threadCount; ++i) {
+			m_renderThreads[i] = new Thread(new Runnable() {
+				@Override
+				public synchronized void run() {
+					for (;;) {
+						// Initialize next draw action to null.
+						DrawAction action = null;
+
+						// Lock draw queue.
+						synchronized (m_drawQueue) {
+							// Process the next action if not empty.
+							if (!m_drawQueue.isEmpty()) {
+								action = m_drawQueue.pop();
+							}
+						}
+						if (action != null) {
+							// Draw triangle and increment counter.
+							fillTriangle(action);
+							++m_drawCount;
+							// Allow other threads to do computations.
+							Thread.yield();
+						}
+					}
+				}
+			});
+			m_renderThreads[i].start();
+		}
 		// Initialize state.
 		m_textures = new BufferedImage[32];
 		m_meshes = new Mesh[32];
