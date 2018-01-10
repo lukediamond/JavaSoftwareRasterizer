@@ -138,7 +138,7 @@ public class RasterPanel extends JPanel {
 			e.printStackTrace();
 		}
 	}
-
+	
 	/**
 	 * The meat of the rasterizer, handles filling triangles.
 	 * @param id The ID of the texture to sample.
@@ -215,6 +215,14 @@ public class RasterPanel extends JPanel {
 				// world-space coordinate by the model-projection matrix, then
 				// divide by w to make it a 3-dimensional vector.
 				ssc = mvp.mult(new Vector4(ic, 1.0f)).wdivide();
+
+				if (
+					ssc.x < -1.0f 
+					|| ssc.x > 1.0f 
+					|| ssc.y < -1.0f 
+					|| ssc.y > 1.0f) {
+					continue;
+				}
 
 				// Calculate the screen coordinates to draw the pixel to.
 				int dcoordX =

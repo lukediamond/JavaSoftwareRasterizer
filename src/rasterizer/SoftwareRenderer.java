@@ -14,6 +14,13 @@ import rasterizer.Mesh;
  * RasterPanel.
  */
 public class SoftwareRenderer extends JFrame {
+
+	float dirX = 0.0f;
+	float dirY = 0.0f;
+
+	float lookDirX = 0.0f;
+	float lookDirY = 0.0f;
+
 	// RasterPanel to handle rendering.
 	private RasterPanel m_panel;
 
@@ -37,12 +44,52 @@ public class SoftwareRenderer extends JFrame {
 
 		// Add key listener for input handling.
 		this.addKeyListener(new KeyListener() {
+			// Key repeat counters.
+			long m_lastMillisPressed = 0;
+			long m_lastMillisReleased = 0;
+
 			/**
 			 * Handles key press inside the window.
 			 * @param e The key event emitted.
 			 */
 			@Override
 			public void keyPressed(KeyEvent e) {
+				// Check for key-repeat
+				long now = System.currentTimeMillis();
+				if (Math.abs(now - m_lastMillisPressed) <= 100) { 
+					m_lastMillisPressed = now;
+					return;
+				}
+				m_lastMillisPressed = now;
+
+				// Handle movement key press.
+				if (e.getKeyCode() == KeyEvent.VK_W) {
+					dirY = 1.0f;
+				}
+				if (e.getKeyCode() == KeyEvent.VK_A) {
+					dirX = -1.0f;
+				}
+				if (e.getKeyCode() == KeyEvent.VK_S) {
+					dirY = -1.0f;
+				}
+				if (e.getKeyCode() == KeyEvent.VK_D) {
+					dirX = 1.0f;
+				}
+
+				// Handle turning key press.
+				if (e.getKeyCode() == KeyEvent.VK_LEFT) {
+					lookDirX = -1.0f; 
+				}
+				if (e.getKeyCode() == KeyEvent.VK_UP) {
+					lookDirY = -1.0f;
+				}
+				if (e.getKeyCode() == KeyEvent.VK_RIGHT) {
+					lookDirX = 1.0f;
+				}
+				if (e.getKeyCode() == KeyEvent.VK_DOWN) {
+					lookDirY = 1.0f;
+				}
+
 				if (e.getKeyCode() == KeyEvent.VK_ESCAPE) {
 					System.exit(0);
 				}
@@ -54,6 +101,30 @@ public class SoftwareRenderer extends JFrame {
 			 */
 			@Override
 			public void keyReleased(KeyEvent e) {
+
+				// Handle movement key release.
+				if (
+					e.getKeyCode() == KeyEvent.VK_W 
+					|| e.getKeyCode() == KeyEvent.VK_S) {
+					dirY = 0.0f;
+				}
+				if (
+					e.getKeyCode() == KeyEvent.VK_A
+					|| e.getKeyCode() == KeyEvent.VK_D) {
+					dirX = 0.0f;
+				}
+
+				// Handle turning key release
+				if (
+					e.getKeyCode() == KeyEvent.VK_UP 
+					|| e.getKeyCode() == KeyEvent.VK_DOWN) {
+					lookDirY = 0.0f;
+				}
+				if (
+					e.getKeyCode() == KeyEvent.VK_LEFT
+					|| e.getKeyCode() == KeyEvent.VK_RIGHT) {
+					lookDirX = 0.0f;
+				}
 			}
 
 			/**
@@ -75,8 +146,11 @@ public class SoftwareRenderer extends JFrame {
 
 		// Load mesh from file.
 		MeshResource cuberes = new MeshResource("cube.obj");
-		Mesh cube = new Mesh(0, cuberes);
-		cube.setPosition(0.0f, 0.0f, 6.0f);
+		// Create mesh(es).
+		Mesh cube0 = new Mesh(0, cuberes);
+		cube0.setPosition(2.0f, 0.0f, 6.0f);
+		Mesh cube1 = new Mesh(0, cuberes);
+		cube1.setPosition(-2.0f, 0.0f, 6.0f);
 
 		// Load floor from file
 		MeshResource floorres = new MeshResource("plane.obj");
@@ -86,12 +160,11 @@ public class SoftwareRenderer extends JFrame {
 		floor.setRotation(90.0f, 0.0f, 0.0f);
 		floor.setScale(2.0f, 2.0f, 0.0f);
 
-		// Add meshs to panel.
-		m_panel.addMesh(cube);
+		// Add meshes to panel.
+		m_panel.addMesh(cube0);
+		m_panel.addMesh(cube1);
 		m_panel.addMesh(floor);
 
-		m_panel.setCameraPosition(new Vector3(0.0f, 4.0f, -2.0f));
-		m_panel.setCameraRotation(new Vector3(45.0f, 0.0f, 0.0f));
 
 		// Set update listener for moving the mesh.
 		m_panel.setUpdateListener(new IUpdateListener() {
@@ -104,7 +177,22 @@ public class SoftwareRenderer extends JFrame {
 			@Override
 			public void update(float delta) {
 				elapsed += delta;
-				cube.setRotation(45.0f, 90.0f * elapsed, 45.0f * elapsed);
+				// Get current camera transform.
+				Vector3 camPos = m_panel.getCameraPosition();
+				Vector3 camRot = m_panel.getCameraRotation();
+				// Transform camera based on user input.
+				m_panel.setCameraPosition(
+					new Vector3(
+						camPos.x + dirX * delta, 
+						camPos.y, 
+						camPos.z + dirY * delta));
+				m_panel.setCameraRotation(
+					new Vector3(
+						camRot.x + lookDirY * delta * 45.0f,
+						camRot.y + lookDirX * delta * 45.0f,
+						camRot.z));
+				cube0.setRotation(45.0f, 90.0f * elapsed, 45.0f * elapsed);
+				cube1.setRotation(45.0f, 90.0f * elapsed, -45.0f * elapsed);
 			}
 		});
 
@@ -112,7 +200,7 @@ public class SoftwareRenderer extends JFrame {
 		// Start indefinite repaint thread.
 		// Will be killed at window exit.
 		this.setVisible(true);
-		new Thread(() -> { for (;;) { m_panel.repaint(); } }).start();
+	for (;;) { m_panel.repaint(); }
 	}
 
 	/**

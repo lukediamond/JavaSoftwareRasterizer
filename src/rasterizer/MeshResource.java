@@ -77,10 +77,13 @@ public class MeshResource {
                     String pairsplit[] = split[i].split("/");
                     // Parse indices.
                     int vc = Integer.parseInt(pairsplit[0]);
-                    int tc = Integer.parseInt(pairsplit[1]);
-                    // Add indices.
+                    if (pairsplit.length > 1) {
+                        int tc = Integer.parseInt(pairsplit[1]);
+                        // Add texture index.
+                        tindices.add(tc);
+                    }
+                    // Add vertex index.
                     vindices.add(vc);
-                    tindices.add(tc);
                 }
             } else if (line.startsWith("vt ")) {
                 // Read texture coordinate from line.
