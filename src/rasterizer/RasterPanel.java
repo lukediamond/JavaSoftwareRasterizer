@@ -29,6 +29,12 @@ public class RasterPanel extends JPanel {
 	private volatile ArrayDeque<DrawAction> m_drawQueue;
 	private volatile int m_drawCount = 0;
 
+	// Debug info.
+	private Integer m_drawnFragments = 0;
+	private Integer m_discardedFragments = 0;
+	private Integer m_occludedFragments = 0;
+	private Integer m_FPS = 0;
+
 	// Camera state.
 	private Vector3 m_cameraPosition;
 	private Vector3 m_cameraRotation;
@@ -138,7 +144,7 @@ public class RasterPanel extends JPanel {
 			e.printStackTrace();
 		}
 	}
-	
+
 	/**
 	 * The meat of the rasterizer, handles filling triangles.
 	 * @param id The ID of the texture to sample.
@@ -221,6 +227,10 @@ public class RasterPanel extends JPanel {
 					|| ssc.x > 1.0f 
 					|| ssc.y < -1.0f 
 					|| ssc.y > 1.0f) {
+					// Increment discarded (offscreen) fragment debug counter.
+					synchronized (m_discardedFragments) {
+						++m_discardedFragments;
+					}
 					continue;
 				}
 
@@ -267,12 +277,24 @@ public class RasterPanel extends JPanel {
 							clamp(atten * 1.0f, 0.0f, 1.0f));
 
 					// Write screen-space depth value to depth buffer.
-					m_depthBuffer[dcoordX][dcoordY] = ssc.z;
+					synchronized (m_depthBuffer) {
+						m_depthBuffer[dcoordX][dcoordY] = ssc.z;
+					}
 					// Write color to backbuffer.
 					m_backBuffer.setRGB(
 						(int) dcoordX,
 						(int) m_screenHeight - dcoordY - 1,
 						color.getRGB());
+
+					// Increment drawn fragment counter.
+					synchronized (m_drawnFragments) {
+						++m_drawnFragments;
+					}
+				} else {
+					// Increment occluded fragment debug counter.
+					synchronized (m_occludedFragments) {
+						++m_occludedFragments;
+					}
 				}
 			}
 		}
@@ -311,9 +333,9 @@ public class RasterPanel extends JPanel {
 			Matrix4.perspective(
 				(float) m_backBuffer.getWidth()
 				/ (float) m_backBuffer.getHeight(),
-				45.0f,
+				90.0f,
 				0.01f,
-				10.0f);
+				20.0f);
 		Matrix4 view = 
 			Matrix4.transform(
 				m_cameraPosition.mult(-1.0f), 
@@ -370,8 +392,25 @@ public class RasterPanel extends JPanel {
 			null);
 		// Set the text color to draw the debug info.
 		g.setColor(Color.WHITE);
-		// Draw polycount to screen.
-		g.drawString("POLYCOUNT: " + triangleSum, 32, 32);
+		// Get bytes allocated by JVM instance (in megabytes).
+		float allocated = 
+			Math.round(100.0f * 
+			(((Runtime.getRuntime().totalMemory() 
+			- Runtime.getRuntime().freeMemory()) / 1024.0f / 1024.0f)))
+			/ 100.0f;
+		// Draw debug info.
+		g.drawString("POLYCOUNT:           " + triangleSum, 32, 32);
+		g.drawString("THREADS:             " + m_threadCount, 32, 64);
+		g.drawString("DRAWN FRAGMENTS:     " + m_drawnFragments, 32, 96);
+		g.drawString("DISCARDED FRAGMENTS: " + m_discardedFragments, 32, 128);
+		g.drawString("OCCLUDED FRAGMENTS:  " + m_occludedFragments, 32, 160);
+		g.drawString("FPS:                 " + m_FPS, 32, 192);
+		g.drawString("MEMORY:              " + allocated + "mb", 32, 224);
+		// Reset debug info.
+		m_drawnFragments = 0;
+		m_discardedFragments = 0;
+		m_occludedFragments = 0;
+
 		// Clear the backbuffer.
 		ig.clearRect(0, 0, m_screenWidth, m_screenHeight);
 		// Fill depth buffer with 100% depth.
@@ -392,7 +431,7 @@ public class RasterPanel extends JPanel {
 		++m_frames;
 		// Print frame count to console if FPS accumulator goes over 1 second.
 		if (m_fpsAccumulator > 1.0f) {
-			System.out.println("FPS: " + m_frames);
+			m_FPS = m_frames;
 			// Reset FPS accumulators.
 			m_frames = 0;
 			m_fpsAccumulator = 0.0f;
@@ -467,12 +506,12 @@ public class RasterPanel extends JPanel {
 		m_depthBuffer = new float[width / m_RESDIVISOR][height / m_RESDIVISOR];
 		// Initialize threads.
 
-		// Use ones less thread than the number of available CPU cores.
-		m_threadCount = Runtime.getRuntime().availableProcessors() - 1;
+		// Use one thread per CPU core.
+		m_threadCount = Runtime.getRuntime().availableProcessors();
 		m_renderThreads = new Thread[m_threadCount];
 		m_drawQueue = new ArrayDeque<DrawAction>();
 		for (int i = 0; i < m_threadCount; ++i) {
-			m_renderThreads[i] = new Thread(new Runnable() {
+			Thread t = new Thread(new Runnable() {
 				@Override
 				public synchronized void run() {
 					for (;;) {
@@ -490,13 +529,14 @@ public class RasterPanel extends JPanel {
 							// Draw triangle and increment counter.
 							fillTriangle(action);
 							++m_drawCount;
-							// Allow other threads to do computations.
+							// Allow other threads to compute.
 							Thread.yield();
 						}
 					}
 				}
 			});
-			m_renderThreads[i].start();
+			t.start();
+			m_renderThreads[i] = t;
 		}
 		// Initialize state.
 		m_textures = new BufferedImage[32];

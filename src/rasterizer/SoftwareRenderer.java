@@ -17,6 +17,7 @@ public class SoftwareRenderer extends JFrame {
 
 	float dirX = 0.0f;
 	float dirY = 0.0f;
+	float dirZ = 0.0f;
 
 	float lookDirX = 0.0f;
 	float lookDirY = 0.0f;
@@ -64,16 +65,22 @@ public class SoftwareRenderer extends JFrame {
 
 				// Handle movement key press.
 				if (e.getKeyCode() == KeyEvent.VK_W) {
-					dirY = 1.0f;
+					dirZ = 1.0f;
 				}
-				if (e.getKeyCode() == KeyEvent.VK_A) {
+				else if (e.getKeyCode() == KeyEvent.VK_A) {
 					dirX = -1.0f;
 				}
-				if (e.getKeyCode() == KeyEvent.VK_S) {
-					dirY = -1.0f;
+				else if (e.getKeyCode() == KeyEvent.VK_S) {
+					dirZ = -1.0f;
 				}
-				if (e.getKeyCode() == KeyEvent.VK_D) {
+				else if (e.getKeyCode() == KeyEvent.VK_D) {
 					dirX = 1.0f;
+				}
+				else if (e.getKeyCode() == KeyEvent.VK_Q) {
+					dirY = 1.0f;
+				}
+				else if (e.getKeyCode() == KeyEvent.VK_E) {
+					dirY = -1.0f;
 				}
 
 				// Handle turning key press.
@@ -106,12 +113,17 @@ public class SoftwareRenderer extends JFrame {
 				if (
 					e.getKeyCode() == KeyEvent.VK_W 
 					|| e.getKeyCode() == KeyEvent.VK_S) {
-					dirY = 0.0f;
+					dirZ = 0.0f;
 				}
 				if (
 					e.getKeyCode() == KeyEvent.VK_A
 					|| e.getKeyCode() == KeyEvent.VK_D) {
 					dirX = 0.0f;
+				}
+				if (
+					e.getKeyCode() == KeyEvent.VK_Q
+					|| e.getKeyCode() == KeyEvent.VK_E) {
+					dirY = 0.0f;
 				}
 
 				// Handle turning key release
@@ -141,7 +153,7 @@ public class SoftwareRenderer extends JFrame {
 		this.setContentPane(m_panel);
 
 		// Set up scene.
-		m_panel.addTexture(0, "difmap.png");
+		m_panel.addTexture(0, "img.png");
 		m_panel.addTexture(1, "floor.png");
 
 		// Load mesh from file.
@@ -149,8 +161,6 @@ public class SoftwareRenderer extends JFrame {
 		// Create mesh(es).
 		Mesh cube0 = new Mesh(0, cuberes);
 		cube0.setPosition(2.0f, 0.0f, 6.0f);
-		Mesh cube1 = new Mesh(0, cuberes);
-		cube1.setPosition(-2.0f, 0.0f, 6.0f);
 
 		// Load floor from file
 		MeshResource floorres = new MeshResource("plane.obj");
@@ -162,9 +172,7 @@ public class SoftwareRenderer extends JFrame {
 
 		// Add meshes to panel.
 		m_panel.addMesh(cube0);
-		m_panel.addMesh(cube1);
 		m_panel.addMesh(floor);
-
 
 		// Set update listener for moving the mesh.
 		m_panel.setUpdateListener(new IUpdateListener() {
@@ -183,16 +191,15 @@ public class SoftwareRenderer extends JFrame {
 				// Transform camera based on user input.
 				m_panel.setCameraPosition(
 					new Vector3(
-						camPos.x + dirX * delta, 
-						camPos.y, 
-						camPos.z + dirY * delta));
+						camPos.x + dirX * delta * 2.0f, 
+						camPos.y + dirY * delta * 2.0f, 
+						camPos.z + dirZ * delta * 2.0f));
 				m_panel.setCameraRotation(
 					new Vector3(
 						camRot.x + lookDirY * delta * 45.0f,
 						camRot.y + lookDirX * delta * 45.0f,
 						camRot.z));
 				cube0.setRotation(45.0f, 90.0f * elapsed, 45.0f * elapsed);
-				cube1.setRotation(45.0f, 90.0f * elapsed, -45.0f * elapsed);
 			}
 		});
 
@@ -200,13 +207,13 @@ public class SoftwareRenderer extends JFrame {
 		// Start indefinite repaint thread.
 		// Will be killed at window exit.
 		this.setVisible(true);
-	for (;;) { m_panel.repaint(); }
+		for (;;) { m_panel.repaint(); }
 	}
 
 	/**
 	 * Main method. Creates an instance of the renderer with the window size.
 	 * @param args The command-line arguments passed in by the OS.
 	 */
-	public static void main(String[] args) { new SoftwareRenderer(640, 480); }
+	public static void main(String[] args) { new SoftwareRenderer(1024, 768); }
 
 }
