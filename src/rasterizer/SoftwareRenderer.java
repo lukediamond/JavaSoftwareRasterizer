@@ -140,7 +140,7 @@ public class SoftwareRenderer extends JFrame {
 		this.setContentPane(m_panel);
 
 		// Set up scene.
-		m_panel.addTexture(0, "img.png");
+		m_panel.addTexture(0, "difmap.png");
 		m_panel.addTexture(1, "floor.png");
 
 		// Load mesh from file.
@@ -201,6 +201,6 @@ public class SoftwareRenderer extends JFrame {
 	 * Main method. Creates an instance of the renderer with the window size.
 	 * @param args The command-line arguments passed in by the OS.
 	 */
-	public static void main(String[] args) { new SoftwareRenderer(1024, 768); }
+	public static void main(String[] args) { new SoftwareRenderer(640, 480); }
 
 }

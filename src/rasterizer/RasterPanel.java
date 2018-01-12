@@ -29,14 +29,14 @@ public class RasterPanel extends JPanel {
 	private Thread[] m_renderThreads;
 	private int m_threadCount;
 	private volatile ArrayDeque<DrawAction> m_drawQueue;
-	private volatile int m_drawCount = 0;
+	private volatile Integer m_drawCount = 0;
 
 	// Debug info.
 	private Font m_debugFont;
-	private Integer m_drawnFragments = 0;
-	private Integer m_discardedFragments = 0;
-	private Integer m_occludedFragments = 0;
-	private Integer m_FPS = 0;
+	private volatile Integer m_drawnFragments = 0;
+	private volatile Integer m_discardedFragments = 0;
+	private volatile Integer m_occludedFragments = 0;
+	private volatile Integer m_FPS = 0;
 
 	// Camera state.
 	private Vector3 m_cameraPosition;
@@ -58,7 +58,7 @@ public class RasterPanel extends JPanel {
 	IUpdateListener m_listener;
 
 	// Resolution divisor (for low-res upscaling, improves FPS).
-	final int m_RESDIVISOR = 4;
+	final int m_RESDIVISOR = 6;
 
 	/**
 	 * Linearly interpolates between two floats given an alpha value.
@@ -148,6 +148,11 @@ public class RasterPanel extends JPanel {
 		}
 	}
 
+
+	// Define the position of the point light in the scene.
+	Vector3 lightPos = new Vector3(0.0f, 1.0f, 4.0f);
+	Color lightColor = new Color(0, 0, 255);
+   
 	/**
 	 * The meat of the rasterizer, handles filling triangles.
 	 * @param id The ID of the texture to sample.
@@ -166,64 +171,47 @@ public class RasterPanel extends JPanel {
 		// Compute model-view-projection matrix.
 		Matrix4 mvp = action.proj.mult(action.view).mult(action.model);
 
-		// First blend variable (between vert/texcoord a and b).
-		float alphaX;
-		// Interpolated vertices.
-		Vector3 ia;
-		Vector3 ib;
-		// Interpolated texture coordinates.
-		Vector2 ita;
-		Vector2 itb;
+    	Matrix4 mv = action.view.mult(action.model);
+		Vector3 ta = mvp.mult(new Vector4(action.va, 1.0f)).wdivide();
+		Vector3 tb = mvp.mult(new Vector4(action.vb, 1.0f)).wdivide();
+		Vector3 tc = mvp.mult(new Vector4(action.vc, 1.0f)).wdivide();
 
-		// Define the position of the point light in the scene.
-		Vector3 lightPos = new Vector3(0.0f, 1.0f, 4.0f);
-		Color lightColor = new Color(128, 128, 255);
+		// Compute maximum screen-space distance of vertices.
+		final float maxDist =
+			Math.max(
+				ta.distance(tb), 
+				Math.max(
+					ta.distance(tc), 
+					tb.distance(tc)));
 
+		// Compute the amount to increment alphaX and alphaY each iteration.
+		final float ITER_X_INV = 
+			1.0f / Math.round(m_screenWidth * maxDist);
+		final float ITER_Y_INV = 
+			1.0f / Math.round(m_screenHeight * maxDist);
 
-		// Compute the number of X and Y interpolation iterations to perform.
-		final int ITER_X = m_screenWidth;
-		final int ITER_Y = m_screenHeight;
-		// Compute the inverses of the X and Y iterations to multiply to map
-		// the iteration counter to the range [0, 1].
-		final float ITER_X_INV = 1.0f / ITER_X;
-		final float ITER_Y_INV = 1.0f / ITER_Y;
+		if (ITER_X_INV < 0.0001f || ITER_Y_INV < 0.0001f) { return; }
 
-		// Perform X iterations (from 0 to ITER_X).
-		for (int i = 0; i < ITER_X; ++i) {
-			// Set first blend variable to the iteration counter mapped to
-			// the range [0, 1] using ITER_X_INV.
-			alphaX = (float) i * ITER_X_INV;
+		int drawnFragments = 0;
+		int discardedFragments = 0;
+		int occludedFragments = 0;
 
+		// Perform X iterations (from 0 to 1).
+		for (float alphaX = 0.0f; alphaX < 1.0f; alphaX += ITER_X_INV) {
 			// Interpolate between first and second vertex.
-			ia = action.va.lerp(action.vb, alphaX);
+			Vector3 ia = action.va.lerp(action.vb, alphaX);
 			// Interpolate first and third vertex.
-			ib = action.va.lerp(action.vc, alphaX);
-			// Interpolate between first and second texture coordinate.
-			ita = action.ta.lerp(action.tb, alphaX);
-			// Interpolate between first and third texture coordinate.
-			itb = action.ta.lerp(action.tc, alphaX);
+			Vector3 ib = action.va.lerp(action.vc, alphaX);
 
-			// Second interpolation alpha.
-			float alphaY;
-			// Second interpolation vertex.
-			Vector3 ic;
-			// Screen-space coordinate.
-			Vector3 ssc;
-			// Interpolated texture coordinate.
-			Vector2 it;
-
-			// Perform Y iterations (from 0 to ITER_Y).
-			for (int i2 = 0; i2 < ITER_Y; ++i2) {
-				// Set second blend variable to the iteration counter mapped to
-				// the range [0, 1] using ITER_Y_INV.
-				alphaY = (float) i2 * ITER_Y_INV;
+			// Perform Y iterations (from 0 to 1).
+			for (float alphaY = 0.0f; alphaY < 1.0f; alphaY += ITER_Y_INV) {
 				// Interpolate between the first interpolated variable and the
 				// second interpolated variable.
-				ic = ia.lerp(ib, alphaY);
+				Vector3 ic = ia.lerp(ib, alphaY);
 				// Compute screen-space coordinate by multiplying the
 				// world-space coordinate by the model-projection matrix, then
 				// divide by w to make it a 3-dimensional vector.
-				ssc = mvp.mult(new Vector4(ic, 1.0f)).wdivide();
+				Vector3 ssc = mvp.mult(new Vector4(ic, 1.0f)).wdivide();
 
 				if (
 					ssc.x < -1.0f 
@@ -231,75 +219,74 @@ public class RasterPanel extends JPanel {
 					|| ssc.y < -1.0f 
 					|| ssc.y > 1.0f) {
 					// Increment discarded (offscreen) fragment debug counter.
-					synchronized (m_discardedFragments) {
-						++m_discardedFragments;
-					}
+					++discardedFragments;
 					continue;
 				}
 
 				// Calculate the screen coordinates to draw the pixel to.
-				int dcoordX =
-					(int) clamp(
-						// Map [-1, 1] to [0, 1].
-						(ssc.x + 1.0f) * 0.5f * m_screenWidth,
-						0.0f,
-						(float) m_screenWidth - 1);
-				int dcoordY =
-					(int) clamp(
-						// Map [-1, 1] to [0, 1]
-						(ssc.y + 1.0f) * 0.5f * m_screenHeight,
-						0.0f,
-						(float) m_screenHeight - 1);
+				int dcoordX = 
+					(int) ((ssc.x + 1.0f) * 0.5f * (m_screenWidth - 1));
+				int dcoordY = 
+					(int) ((ssc.y + 1.0f) * 0.5f * (m_screenHeight - 1));
 
 				// Perform depth test to prevent drawing occluded fragments.
-				if (ssc.z < m_depthBuffer[dcoordX][dcoordY]) {
-					// Compute texture coordinate by blending first interpolated
-					// coordinate with second interpolated coordinate.
-					it = ita.lerp(itb, alphaY);
-					// Compute world-space position for lighting calculations.
-					Vector3 world = 
-						action.model.mult(new Vector4(ic, 1.0f)).wdivide();
-					// Sample texture using texture coordinate.
-					Color color = sampleImage(tex, it.x, it.y);
+				synchronized (m_depthBuffer) {
+					if (ssc.z < m_depthBuffer[dcoordX][dcoordY]) {
+						// Compute texture coordinate by blending first interpolated
+						// coordinate with second interpolated coordinate.
+						Vector2 it = 
+							action.ta.lerp(action.tb, alphaX).lerp(
+								action.ta.lerp(action.tc, alphaX), alphaY);
+						// Compute world-space position for lighting calculations.
+						Vector3 world =
+							action.model.mult(new Vector4(ic, 1.0f)).wdivide();
+						// Sample texture using texture coordinate.
+						Color color = sampleImage(tex, it.x, it.y);
 
-					// Compute the inverse square attenuation 
-					// factor on the light.
-					float atten = 
-						1.0f 
-						/ (1.0f 
-							+ (float) Math.pow(world.distance(lightPos), 2.0f));
-					// Apply attenuation by blending sampled color
-					// with black using the attenuation factor as the alpha.
-					color =
-						lerpColor(
+						// Compute the inverse square attenuation 
+						// factor on the light.
+						float dist = world.distance(lightPos);
+						float atten = 1.0f / (1.0f + dist * dist);
+						// Apply attenuation by blending sampled color
+						// with black using the attenuation factor as the alpha.
+						color =
 							lerpColor(
-								Color.BLACK, 
-								color, 
-								(float) Math.pow(atten, 0.5f)),
-							lightColor,
-							clamp(atten * 1.0f, 0.0f, 1.0f));
+								lerpColor(
+									Color.BLACK, 
+									color, 
+									atten * 4.0f),
+								lightColor,
+								clamp(atten * 1.0f, 0.0f, 1.0f));
 
-					// Write screen-space depth value to depth buffer.
-					synchronized (m_depthBuffer) {
+						// Write screen-space depth value to depth buffer.
 						m_depthBuffer[dcoordX][dcoordY] = ssc.z;
-					}
-					// Write color to backbuffer.
-					m_backBuffer.setRGB(
-						(int) dcoordX,
-						(int) m_screenHeight - dcoordY - 1,
-						color.getRGB());
 
-					// Increment drawn fragment counter.
-					synchronized (m_drawnFragments) {
-						++m_drawnFragments;
-					}
-				} else {
-					// Increment occluded fragment debug counter.
-					synchronized (m_occludedFragments) {
-						++m_occludedFragments;
+						// Write color to backbuffer.
+						m_backBuffer.setRGB(
+							(int) dcoordX,
+							(int) m_screenHeight - dcoordY - 1,
+							color.getRGB());
+
+						// Increment drawn fragment counter.
+						++drawnFragments;
+					} else {
+						// Increment occluded fragment debug counter.
+						++occludedFragments;
 					}
 				}
 			}
+		}
+
+		synchronized (m_drawnFragments) {
+			m_drawnFragments += drawnFragments;
+		}
+
+		synchronized (m_occludedFragments) {
+			m_occludedFragments += occludedFragments;
+		}
+
+		synchronized (m_discardedFragments) {
+			m_discardedFragments += discardedFragments;
 		}
 	}
 
@@ -516,7 +503,7 @@ public class RasterPanel extends JPanel {
 		// Initialize threads.
 
 		// Use one thread per CPU core.
-		m_threadCount = Runtime.getRuntime().availableProcessors();
+		m_threadCount = Runtime.getRuntime().availableProcessors() * 2;
 		m_renderThreads = new Thread[m_threadCount];
 		m_drawQueue = new ArrayDeque<DrawAction>();
 		for (int i = 0; i < m_threadCount; ++i) {
@@ -537,7 +524,9 @@ public class RasterPanel extends JPanel {
 						if (action != null) {
 							// Draw triangle and increment counter.
 							fillTriangle(action);
-							++m_drawCount;
+							synchronized (m_drawCount) {
+								++m_drawCount;
+							}
 							// Allow other threads to compute.
 							Thread.yield();
 						}
