@@ -36,7 +36,7 @@ public class RasterPanel extends JPanel {
 	private volatile Integer m_drawnFragments = 0;
 	private volatile Integer m_discardedFragments = 0;
 	private volatile Integer m_occludedFragments = 0;
-	private volatile Integer m_FPS = 0;
+	private Integer m_FPS = 0;
 
 	// Camera state.
 	private Vector3 m_cameraPosition;
@@ -190,7 +190,7 @@ public class RasterPanel extends JPanel {
 		final float ITER_Y_INV = 
 			1.0f / Math.round(m_screenHeight * maxDist);
 
-		if (ITER_X_INV < 0.0001f || ITER_Y_INV < 0.0001f) { return; }
+		if (ITER_X_INV < 0.0005f || ITER_Y_INV < 0.0005f) { return; }
 
 		int drawnFragments = 0;
 		int discardedFragments = 0;
@@ -369,7 +369,17 @@ public class RasterPanel extends JPanel {
 			}
 		}
 
-		while (m_drawCount < triangleSum) {
+		// Loop until all queued triangles are drawn.
+		for (;;) {
+			// Lock draw count to check.
+			synchronized (m_drawCount) {
+				if (m_drawCount == triangleSum) {
+					// Break if all triangles are drawn.
+					break;
+				}
+			}
+			// Give slice of time to draw threads.
+			Thread.yield();
 		}
 		m_drawCount = 0;
 
@@ -503,7 +513,7 @@ public class RasterPanel extends JPanel {
 		// Initialize threads.
 
 		// Use one thread per CPU core.
-		m_threadCount = Runtime.getRuntime().availableProcessors() * 2;
+		m_threadCount = Runtime.getRuntime().availableProcessors();
 		m_renderThreads = new Thread[m_threadCount];
 		m_drawQueue = new ArrayDeque<DrawAction>();
 		for (int i = 0; i < m_threadCount; ++i) {
@@ -528,8 +538,8 @@ public class RasterPanel extends JPanel {
 								++m_drawCount;
 							}
 							// Allow other threads to compute.
-							Thread.yield();
 						}
+						Thread.yield();
 					}
 				}
 			});

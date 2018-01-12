@@ -191,10 +191,11 @@ public class SoftwareRenderer extends JFrame {
 		});
 
 
+		// Open window.
+		this.setVisible(true);
 		// Start indefinite repaint thread.
 		// Will be killed at window exit.
-		this.setVisible(true);
-		for (;;) { m_panel.repaint(); }
+		new Thread(() -> { for (;;) { m_panel.repaint(); } }).start();
 	}
 
 	/**
