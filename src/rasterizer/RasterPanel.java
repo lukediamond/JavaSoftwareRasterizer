@@ -336,11 +336,12 @@ public class RasterPanel extends JPanel {
 				90.0f,
 				0.01f,
 				20.0f);
+		// Compute view matrix.
 		Matrix4 view = 
-			Matrix4.transform(
-				m_cameraPosition.mult(-1.0f), 
-				m_cameraRotation.mult(-1.0f), 
-				Vector3.ONE);
+			Matrix4.rotationX(-m_cameraRotation.x)
+			.mult(Matrix4.rotationY(-m_cameraRotation.y))
+			.mult(Matrix4.rotationZ(-m_cameraRotation.z))
+			.mult(Matrix4.translation(m_cameraPosition.mult(-1.0f)));
 
 		// Create pool for render threads.
 		ArrayList<Thread> threadPool = new ArrayList<Thread>();
