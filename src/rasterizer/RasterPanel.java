@@ -4,6 +4,7 @@ import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.awt.Graphics;
 import java.awt.Color;
+import java.awt.Font;
 import javax.swing.JPanel;
 import java.awt.Point;
 import java.util.HashMap;
@@ -23,6 +24,7 @@ public class RasterPanel extends JPanel {
 	private volatile BufferedImage m_backBuffer;
 	private volatile float[][] m_depthBuffer;
 
+
 	// Render thread state.
 	private Thread[] m_renderThreads;
 	private int m_threadCount;
@@ -30,6 +32,7 @@ public class RasterPanel extends JPanel {
 	private volatile int m_drawCount = 0;
 
 	// Debug info.
+	private Font m_debugFont;
 	private Integer m_drawnFragments = 0;
 	private Integer m_discardedFragments = 0;
 	private Integer m_occludedFragments = 0;
@@ -333,7 +336,7 @@ public class RasterPanel extends JPanel {
 			Matrix4.perspective(
 				(float) m_backBuffer.getWidth()
 				/ (float) m_backBuffer.getHeight(),
-				90.0f,
+				45.0f,
 				0.01f,
 				20.0f);
 		// Compute view matrix.
@@ -400,6 +403,7 @@ public class RasterPanel extends JPanel {
 			- Runtime.getRuntime().freeMemory()) / 1024.0f / 1024.0f)))
 			/ 100.0f;
 		// Draw debug info.
+		g.setFont(m_debugFont);
 		g.drawString("POLYCOUNT:           " + triangleSum, 32, 32);
 		g.drawString("THREADS:             " + m_threadCount, 32, 64);
 		g.drawString("DRAWN FRAGMENTS:     " + m_drawnFragments, 32, 96);
@@ -407,6 +411,10 @@ public class RasterPanel extends JPanel {
 		g.drawString("OCCLUDED FRAGMENTS:  " + m_occludedFragments, 32, 160);
 		g.drawString("FPS:                 " + m_FPS, 32, 192);
 		g.drawString("MEMORY:              " + allocated + "mb", 32, 224);
+		g.drawString(
+			"MOVE WITH WASD. TURN WITH ARROW KEYS.", 
+			32, 
+			(m_screenHeight * m_RESDIVISOR) - 64);
 		// Reset debug info.
 		m_drawnFragments = 0;
 		m_discardedFragments = 0;
@@ -539,6 +547,8 @@ public class RasterPanel extends JPanel {
 			t.start();
 			m_renderThreads[i] = t;
 		}
+		// Create debug font.
+		m_debugFont = new Font(Font.MONOSPACED, Font.PLAIN, 16);
 		// Initialize state.
 		m_textures = new BufferedImage[32];
 		m_meshes = new Mesh[32];

@@ -45,24 +45,12 @@ public class SoftwareRenderer extends JFrame {
 
 		// Add key listener for input handling.
 		this.addKeyListener(new KeyListener() {
-			// Key repeat counters.
-			long m_lastMillisPressed = 0;
-			long m_lastMillisReleased = 0;
-
 			/**
 			 * Handles key press inside the window.
 			 * @param e The key event emitted.
 			 */
 			@Override
 			public void keyPressed(KeyEvent e) {
-				// Check for key-repeat
-				long now = System.currentTimeMillis();
-				if (Math.abs(now - m_lastMillisPressed) <= 100) { 
-					m_lastMillisPressed = now;
-					return;
-				}
-				m_lastMillisPressed = now;
-
 				// Handle movement key press.
 				if (e.getKeyCode() == KeyEvent.VK_W) {
 					dirZ = 1.0f;
@@ -108,7 +96,6 @@ public class SoftwareRenderer extends JFrame {
 			 */
 			@Override
 			public void keyReleased(KeyEvent e) {
-
 				// Handle movement key release.
 				if (
 					e.getKeyCode() == KeyEvent.VK_W 
