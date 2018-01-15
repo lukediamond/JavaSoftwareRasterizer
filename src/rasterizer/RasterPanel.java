@@ -35,6 +35,7 @@ public class RasterPanel extends JPanel {
 	private Font m_debugFont;
 	private volatile Integer m_drawnFragments = 0;
 	private volatile Integer m_discardedFragments = 0;
+	private volatile Integer m_discardedPolys = 0;
 	private volatile Integer m_occludedFragments = 0;
 	private Integer m_FPS = 0;
 
@@ -169,12 +170,31 @@ public class RasterPanel extends JPanel {
 		// Get the texture at the given ID.
 		BufferedImage tex = m_textures[action.tex];
 		// Compute model-view-projection matrix.
-		Matrix4 mvp = action.proj.mult(action.view).mult(action.model);
-
     	Matrix4 mv = action.view.mult(action.model);
+		Matrix4 mvp = action.proj.mult(mv);
+
 		Vector3 ta = mvp.mult(new Vector4(action.va, 1.0f)).wdivide();
 		Vector3 tb = mvp.mult(new Vector4(action.vb, 1.0f)).wdivide();
 		Vector3 tc = mvp.mult(new Vector4(action.vc, 1.0f)).wdivide();
+
+		// Find world-space coordinates of vertices.
+		Vector3 worldA = 
+			action.model.mult(new Vector4(action.va, 1.0f)).wdivide();
+		Vector3 worldB = 
+			action.model.mult(new Vector4(action.vb, 1.0f)).wdivide();
+		Vector3 worldC = 
+			action.model.mult(new Vector4(action.vc, 1.0f)).wdivide();
+
+		// Compute surface normal from world-space triangle poly.
+		Vector3 surfaceNormal = 
+			worldA.sub(worldB).cross(worldC.sub(worldB))
+			.normalize();
+
+		// Discard face 
+		if (new Vector3(action.view.c).normalize().dot(surfaceNormal) <= 0.0f) {
+			++m_discardedPolys;
+			return;
+		}
 
 		// Compute maximum screen-space distance of vertices.
 		final float maxDistX =
@@ -191,6 +211,7 @@ public class RasterPanel extends JPanel {
 					Math.abs(tb.y - tc.y)));
 
 		if ((m_screenWidth * maxDistX) * (m_screenHeight * maxDistY) > 1E6) {
+			++m_discardedPolys;
 			return;
 		}
 
@@ -413,9 +434,10 @@ public class RasterPanel extends JPanel {
 		g.drawString("THREADS:             " + m_threadCount, 32, 64);
 		g.drawString("DRAWN FRAGMENTS:     " + m_drawnFragments, 32, 96);
 		g.drawString("DISCARDED FRAGMENTS: " + m_discardedFragments, 32, 128);
-		g.drawString("OCCLUDED FRAGMENTS:  " + m_occludedFragments, 32, 160);
-		g.drawString("FPS:                 " + m_FPS, 32, 192);
-		g.drawString("MEMORY:              " + allocated + "mb", 32, 224);
+		g.drawString("DISCARDED POLYS:     " + m_discardedPolys, 32, 160);
+		g.drawString("OCCLUDED FRAGMENTS:  " + m_occludedFragments, 32, 192);
+		g.drawString("FPS:                 " + m_FPS, 32, 224);
+		g.drawString("MEMORY:              " + allocated + "mb", 32, 256);
 		g.drawString(
 			"MOVE WITH WASD. TURN WITH ARROW KEYS.", 
 			32, 
@@ -423,6 +445,7 @@ public class RasterPanel extends JPanel {
 		// Reset debug info.
 		m_drawnFragments = 0;
 		m_discardedFragments = 0;
+		m_discardedPolys = 0;
 		m_occludedFragments = 0;
 
 		// Clear the backbuffer.

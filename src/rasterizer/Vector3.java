@@ -50,6 +50,28 @@ public class Vector3 {
 	}
 
 	/**
+	 * Computes the difference between two 3-dimensional vectors.
+	 * @param other The vector to subtract.
+	 * @return The difference between this and other.
+	 */
+	public Vector3 sub(Vector3 other) {
+		return new Vector3(x - other.x, y - other.y, z - other.z);
+	}
+
+	/**
+	 * Computes the cross product between two 3-dimensional vectors.
+	 * @param other The vector to cross with.
+	 * @return The cross product of this and other.
+	 */
+	public Vector3 cross(Vector3 other) {
+		// Compute the cross product (linear algebra).
+		return new Vector3(
+			y * other.z - z * other.y,
+			z * other.x - x * other.z,
+			x * other.y - y * other.x);
+	}
+
+	/**
 	 * Compute the length of the vector.
 	 * @return The vector's length.
 	 */
