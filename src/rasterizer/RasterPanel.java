@@ -58,7 +58,7 @@ public class RasterPanel extends JPanel {
 	IUpdateListener m_listener;
 
 	// Resolution divisor (for low-res upscaling, improves FPS).
-	final int m_RESDIVISOR = 6;
+	final int m_RESDIVISOR = 4;
 
 	/**
 	 * Linearly interpolates between two floats given an alpha value.
@@ -177,20 +177,28 @@ public class RasterPanel extends JPanel {
 		Vector3 tc = mvp.mult(new Vector4(action.vc, 1.0f)).wdivide();
 
 		// Compute maximum screen-space distance of vertices.
-		final float maxDist =
+		final float maxDistX =
 			Math.max(
-				ta.distance(tb), 
+				Math.abs(ta.x - tb.x), 
 				Math.max(
-					ta.distance(tc), 
-					tb.distance(tc)));
+					Math.abs(ta.x - tc.x), 
+					Math.abs(tb.x - tc.x)));
+		final float maxDistY =
+			Math.max(
+				Math.abs(ta.y - tb.y), 
+				Math.max(
+					Math.abs(ta.y - tc.y), 
+					Math.abs(tb.y - tc.y)));
+
+		if ((m_screenWidth * maxDistX) * (m_screenHeight * maxDistY) > 1E6) {
+			return;
+		}
 
 		// Compute the amount to increment alphaX and alphaY each iteration.
 		final float ITER_X_INV = 
-			1.0f / Math.round(m_screenWidth * maxDist);
+			1.0f / (m_screenWidth * maxDistX);
 		final float ITER_Y_INV = 
-			1.0f / Math.round(m_screenHeight * maxDist);
-
-		if (ITER_X_INV < 0.0005f || ITER_Y_INV < 0.0005f) { return; }
+			1.0f / (m_screenHeight * maxDistY);
 
 		int drawnFragments = 0;
 		int discardedFragments = 0;
@@ -325,7 +333,7 @@ public class RasterPanel extends JPanel {
 				/ (float) m_backBuffer.getHeight(),
 				45.0f,
 				0.01f,
-				20.0f);
+				1000.0f);
 		// Compute view matrix.
 		Matrix4 view = 
 			Matrix4.rotationX(-m_cameraRotation.x)
