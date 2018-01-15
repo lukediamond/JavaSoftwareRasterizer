@@ -59,7 +59,7 @@ public class RasterPanel extends JPanel {
 	IUpdateListener m_listener;
 
 	// Resolution divisor (for low-res upscaling, improves FPS).
-	final int m_RESDIVISOR = 4;
+	final int m_RESDIVISOR = 8;
 
 	/**
 	 * Linearly interpolates between two floats given an alpha value.
@@ -190,36 +190,31 @@ public class RasterPanel extends JPanel {
 			worldA.sub(worldB).cross(worldC.sub(worldB))
 			.normalize();
 
-		// Discard face 
+		// Discard face if it is facing backwards.
 		if (new Vector3(action.view.c).normalize().dot(surfaceNormal) <= 0.0f) {
-			++m_discardedPolys;
+			// Increment discarded poly counter.
+			synchronized (m_discardedPolys) {
+				++m_discardedPolys;
+			}
 			return;
 		}
 
 		// Compute maximum screen-space distance of vertices.
-		final float maxDistX =
+		final float maxDist =
 			Math.max(
-				Math.abs(ta.x - tb.x), 
+				ta.distance(tb), 
 				Math.max(
-					Math.abs(ta.x - tc.x), 
-					Math.abs(tb.x - tc.x)));
-		final float maxDistY =
-			Math.max(
-				Math.abs(ta.y - tb.y), 
-				Math.max(
-					Math.abs(ta.y - tc.y), 
-					Math.abs(tb.y - tc.y)));
-
-		if ((m_screenWidth * maxDistX) * (m_screenHeight * maxDistY) > 1E6) {
-			++m_discardedPolys;
-			return;
-		}
+					ta.distance(tc), 
+					tb.distance(tc)));
 
 		// Compute the amount to increment alphaX and alphaY each iteration.
 		final float ITER_X_INV = 
-			1.0f / (m_screenWidth * maxDistX);
+			1.0f / (m_screenWidth * maxDist);
 		final float ITER_Y_INV = 
-			1.0f / (m_screenHeight * maxDistY);
+			1.0f / (m_screenHeight * maxDist);
+
+		// Return if computation is too strenuous.
+		if (ITER_X_INV < 1E-4 || ITER_Y_INV < 1E-4) { return; }
 
 		int drawnFragments = 0;
 		int discardedFragments = 0;
@@ -407,8 +402,6 @@ public class RasterPanel extends JPanel {
 					break;
 				}
 			}
-			// Give slice of time to draw threads.
-			Thread.yield();
 		}
 		m_drawCount = 0;
 
@@ -568,9 +561,7 @@ public class RasterPanel extends JPanel {
 							synchronized (m_drawCount) {
 								++m_drawCount;
 							}
-							// Allow other threads to compute.
 						}
-						Thread.yield();
 					}
 				}
 			});
