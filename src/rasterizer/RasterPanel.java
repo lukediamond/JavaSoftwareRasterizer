@@ -176,6 +176,7 @@ public class RasterPanel extends JPanel {
         Matrix4 mv = action.view.mult(action.model);
         Matrix4 mvp = action.proj.mult(mv);
 
+        // Compute vertices in world space.
         Vector3 ta = action.model.mult(new Vector4(action.va, 1.0f)).wdivide();
         Vector3 tb = action.model.mult(new Vector4(action.vb, 1.0f)).wdivide();
         Vector3 tc = action.model.mult(new Vector4(action.vc, 1.0f)).wdivide();
@@ -216,6 +217,7 @@ public class RasterPanel extends JPanel {
         int discardedFragments = 0;
         int occludedFragments = 0;
 
+        // Get time from beginning of rasterization.
         double start = System.nanoTime() * 1E-9;
 
         // Perform X iterations (from 0 to 1).
@@ -359,7 +361,7 @@ public class RasterPanel extends JPanel {
             Matrix4.perspective(
                 (float) m_backBuffer.getWidth()
                 / (float) m_backBuffer.getHeight(),
-                45.0f,
+                70.0f,
                 0.01f,
                 1000.0f);
         // Compute view matrix.
