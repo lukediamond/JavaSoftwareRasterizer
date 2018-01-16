@@ -59,7 +59,7 @@ public class RasterPanel extends JPanel {
 	IUpdateListener m_listener;
 
 	// Resolution divisor (for low-res upscaling, improves FPS).
-	final int m_RESDIVISOR = 8;
+	final int m_RESDIVISOR = 4;
 
 	/**
 	 * Linearly interpolates between two floats given an alpha value.
@@ -177,21 +177,13 @@ public class RasterPanel extends JPanel {
 		Vector3 tb = mvp.mult(new Vector4(action.vb, 1.0f)).wdivide();
 		Vector3 tc = mvp.mult(new Vector4(action.vc, 1.0f)).wdivide();
 
-		// Find world-space coordinates of vertices.
-		Vector3 worldA = 
-			action.model.mult(new Vector4(action.va, 1.0f)).wdivide();
-		Vector3 worldB = 
-			action.model.mult(new Vector4(action.vb, 1.0f)).wdivide();
-		Vector3 worldC = 
-			action.model.mult(new Vector4(action.vc, 1.0f)).wdivide();
-
 		// Compute surface normal from world-space triangle poly.
 		Vector3 surfaceNormal = 
-			worldA.sub(worldB).cross(worldC.sub(worldB))
+			ta.sub(tb).cross(tc.sub(tb))
 			.normalize();
 
 		// Discard face if it is facing backwards.
-		if (new Vector3(action.view.c).normalize().dot(surfaceNormal) <= 0.0f) {
+		if (new Vector3(action.view.c).normalize().dot(surfaceNormal) < 0.0f) {
 			// Increment discarded poly counter.
 			synchronized (m_discardedPolys) {
 				++m_discardedPolys;
