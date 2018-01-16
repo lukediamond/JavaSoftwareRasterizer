@@ -285,9 +285,12 @@ public class RasterPanel extends JPanel {
                                 lerpColor(
                                     Color.BLACK, 
                                     color, 
-                                    atten 
-                                    * Math.abs(ldir.dot(surfaceNormal)) 
-                                    * 4.0f),
+                                    clamp(
+                                        4.0f 
+                                        * atten 
+                                        * Math.abs(ldir.dot(surfaceNormal)),
+                                        0.0f,
+                                        1.0f)),
                                 lightColor,
                                 clamp(atten * 1.0f, 0.0f, 1.0f));
 
