@@ -141,25 +141,15 @@ public class SoftwareRenderer extends JFrame {
 
         // Set up scene.
         m_panel.addTexture(0, "difmap.png");
-        m_panel.addTexture(1, "floor.png");
 
         // Load mesh from file.
         MeshResource cuberes = new MeshResource("suzanne.obj");
         // Create mesh(es).
         Mesh cube0 = new Mesh(0, cuberes);
-        cube0.setPosition(2.0f, 0.0f, 6.0f);
-
-        // Load floor from file
-        MeshResource floorres = new MeshResource("plane.obj");
-        Mesh floor = new Mesh(1, floorres);
-
-        floor.setPosition(0.0f, -1.5f, 6.0f);
-        floor.setRotation(90.0f, 0.0f, 0.0f);
-        floor.setScale(2.0f, 2.0f, 0.0f);
+        cube0.setPosition(0.0f, 0.0f, 6.0f);
 
         // Add meshes to panel.
         m_panel.addMesh(cube0);
-        m_panel.addMesh(floor);
 
         // Set update listener for moving the mesh.
         m_panel.setUpdateListener(new IUpdateListener() {
@@ -171,7 +161,10 @@ public class SoftwareRenderer extends JFrame {
              */
             @Override
             public void update(float delta) {
+            	// Increase elapsed counter.
                 elapsed += delta;
+                // Enforce maximum delta time.
+                if (delta > 0.2f) delta = 0.2f;
                 // Get current camera transform.
                 Vector3 camPos = m_panel.getCameraPosition();
                 Vector3 camRot = m_panel.getCameraRotation();
@@ -186,7 +179,7 @@ public class SoftwareRenderer extends JFrame {
                         camRot.x + lookDirY * delta * 45.0f,
                         camRot.y + lookDirX * delta * 45.0f,
                         camRot.z));
-                cube0.setRotation(45.0f, 90.0f * elapsed, 45.0f * elapsed);
+                cube0.setRotation(0.0f, 90.0f * elapsed, 0.0f);
             }
         });
 
@@ -202,6 +195,6 @@ public class SoftwareRenderer extends JFrame {
      * Main method. Creates an instance of the renderer with the window size.
      * @param args The command-line arguments passed in by the OS.
      */
-    public static void main(String[] args) { new SoftwareRenderer(640, 480); }
+    public static void main(String[] args) { new SoftwareRenderer(1280, 720); }
 
 }

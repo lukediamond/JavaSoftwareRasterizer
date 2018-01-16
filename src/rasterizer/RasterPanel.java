@@ -59,7 +59,10 @@ public class RasterPanel extends JPanel {
     IUpdateListener m_listener;
 
     // Resolution divisor (for low-res upscaling, improves FPS).
-    final int m_RESDIVISOR = 4;
+    final int RES_DIVISOR = 4;
+    // Iteration scale (creates holes in mesh when the camera is close,
+    // but greatly improves FPS).
+    final float ITER_SCALE = 0.5f;
 
     /**
      * Linearly interpolates between two floats given an alpha value.
@@ -201,16 +204,19 @@ public class RasterPanel extends JPanel {
 
         // Compute the amount to increment alphaX and alphaY each iteration.
         final float ITER_X_INV = 
-            1.0f / (m_screenWidth * maxDist);
+            1.0f / (m_screenWidth * maxDist * ITER_SCALE);
         final float ITER_Y_INV = 
-            1.0f / (m_screenHeight * maxDist);
+            1.0f / (m_screenHeight * maxDist * ITER_SCALE);
 
         // Return if computation is too strenuous.
         if (ITER_X_INV < 1E-4 || ITER_Y_INV < 1E-4) { return; }
 
+        // Local debug variables.
         int drawnFragments = 0;
         int discardedFragments = 0;
         int occludedFragments = 0;
+
+        double start = System.nanoTime() * 1E-9;
 
         // Perform X iterations (from 0 to 1).
         for (float alphaX = 0.0f; alphaX < 1.0f; alphaX += ITER_X_INV) {
@@ -221,6 +227,8 @@ public class RasterPanel extends JPanel {
 
             // Perform Y iterations (from 0 to 1).
             for (float alphaY = 0.0f; alphaY < 1.0f; alphaY += ITER_Y_INV) {
+                if (System.nanoTime() * 1E-9 - start > 0.1f) return;
+
                 // Interpolate between the first interpolated variable and the
                 // second interpolated variable.
                 Vector3 ic = ia.lerp(ib, alphaY);
@@ -397,6 +405,7 @@ public class RasterPanel extends JPanel {
         // Loop until all queued triangles are drawn.
         double start = System.nanoTime() * 1E-9;
         while (m_drawCount != triangleSum) {
+            // Force maximum frame time.
             if (System.nanoTime() * 1E-9 - start > 0.5f) break;
         }
         m_drawCount = 0;
@@ -406,8 +415,8 @@ public class RasterPanel extends JPanel {
             m_backBuffer,
             0,
             0,
-            m_screenWidth * m_RESDIVISOR,
-            m_screenHeight * m_RESDIVISOR,
+            m_screenWidth * RES_DIVISOR,
+            m_screenHeight * RES_DIVISOR,
             null);
         // Set the text color to draw the debug info.
         g.setColor(Color.WHITE);
@@ -430,7 +439,7 @@ public class RasterPanel extends JPanel {
         g.drawString(
             "MOVE WITH WASD. TURN WITH ARROW KEYS.", 
             32, 
-            (m_screenHeight * m_RESDIVISOR) - 64);
+            (m_screenHeight * RES_DIVISOR) - 64);
         // Reset debug info.
         m_drawnFragments = 0;
         m_discardedFragments = 0;
@@ -525,11 +534,11 @@ public class RasterPanel extends JPanel {
     RasterPanel(int width, int height) {
         // Initialize back buffer.
         m_backBuffer = new BufferedImage(
-            width / m_RESDIVISOR,
-            height / m_RESDIVISOR,
+            width / RES_DIVISOR,
+            height / RES_DIVISOR,
             BufferedImage.TYPE_INT_RGB);
         // Initialize depth buffer.
-        m_depthBuffer = new float[width / m_RESDIVISOR][height / m_RESDIVISOR];
+        m_depthBuffer = new float[width / RES_DIVISOR][height / RES_DIVISOR];
         // Initialize threads.
 
         // Use one thread per CPU core.
@@ -570,8 +579,8 @@ public class RasterPanel extends JPanel {
         // Initialize state.
         m_textures = new BufferedImage[32];
         m_meshes = new Mesh[32];
-        m_screenWidth = width / m_RESDIVISOR;
-        m_screenHeight = height / m_RESDIVISOR;
+        m_screenWidth = width / RES_DIVISOR;
+        m_screenHeight = height / RES_DIVISOR;
         // Initialize camera.
         m_cameraPosition = Vector3.ZERO;
         m_cameraRotation = Vector3.ZERO;
