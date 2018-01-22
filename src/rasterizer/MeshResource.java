@@ -1,3 +1,10 @@
+/*
+ * Luke Diamond
+ * Mr. Patterson
+ * Grade 11 Final Project
+ * 01/22/2018
+ */
+
 package rasterizer;
 
 import java.io.File;

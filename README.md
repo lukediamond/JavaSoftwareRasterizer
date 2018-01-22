@@ -4,7 +4,21 @@
 
 ![screenshot](screenshot.png)
 
-Features:
+### Building:
+
+GNU Make is recommended to build the project.
+
+To build, run either:
+
+	make
+
+in the root directory of the project, or
+
+	BuildAndRun.bat
+
+in the project directory.
+
+### Features:
 
 * Loading OBJ Files
 * Backface culling
