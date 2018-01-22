@@ -1,8 +1,8 @@
 /*
  * Luke Diamond
- * Mr. Patterson
- * Grade 11 Final Project
  * 01/22/2018
+ * Grade 11 Final Project
+ * Mr. Patterson
  */
 
 package rasterizer;

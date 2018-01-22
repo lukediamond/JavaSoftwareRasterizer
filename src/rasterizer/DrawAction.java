@@ -1,8 +1,8 @@
 /*
  * Luke Diamond
- * Mr. Patterson
- * Grade 11 Final Project
  * 01/22/2018
+ * Grade 11 Final Project
+ * Mr. Patterson
  */
 
 package rasterizer;
@@ -20,15 +20,15 @@ class DrawAction {
 	public Vector2 tc;
 
 	public DrawAction(
-		int tex_, 
-		Matrix4 model_, 
+		int tex_,
+		Matrix4 model_,
 		Matrix4 view_,
-		Matrix4 proj_, 
-		Vector3 va_, 
-		Vector3 vb_, 
-		Vector3 vc_, 
-		Vector2 ta_, 
-		Vector2 tb_, 
+		Matrix4 proj_,
+		Vector3 va_,
+		Vector3 vb_,
+		Vector3 vc_,
+		Vector2 ta_,
+		Vector2 tb_,
 		Vector2 tc_) {
 		tex = tex_;
 		model = model_;

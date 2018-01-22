@@ -1,8 +1,8 @@
 /*
  * Luke Diamond
- * Mr. Patterson
- * Grade 11 Final Project
  * 01/22/2018
+ * Grade 11 Final Project
+ * Mr. Patterson
  */
 
 package rasterizer;
@@ -80,7 +80,7 @@ public class SoftwareRenderer extends JFrame {
 
                 // Handle turning key press.
                 if (e.getKeyCode() == KeyEvent.VK_LEFT) {
-                    lookDirX = -1.0f; 
+                    lookDirX = -1.0f;
                 }
                 if (e.getKeyCode() == KeyEvent.VK_UP) {
                     lookDirY = -1.0f;
@@ -105,7 +105,7 @@ public class SoftwareRenderer extends JFrame {
             public void keyReleased(KeyEvent e) {
                 // Handle movement key release.
                 if (
-                    e.getKeyCode() == KeyEvent.VK_W 
+                    e.getKeyCode() == KeyEvent.VK_W
                     || e.getKeyCode() == KeyEvent.VK_S) {
                     dirZ = 0.0f;
                 }
@@ -122,7 +122,7 @@ public class SoftwareRenderer extends JFrame {
 
                 // Handle turning key release
                 if (
-                    e.getKeyCode() == KeyEvent.VK_UP 
+                    e.getKeyCode() == KeyEvent.VK_UP
                     || e.getKeyCode() == KeyEvent.VK_DOWN) {
                     lookDirY = 0.0f;
                 }
@@ -148,15 +148,22 @@ public class SoftwareRenderer extends JFrame {
 
         // Set up scene.
         m_panel.addTexture(0, "difmap.png");
+        m_panel.addTexture(1, "floor.png");
 
-        // Load mesh from file.
+        // Load meshes from file.
         MeshResource meshres = new MeshResource("suzanne.obj");
+        MeshResource floorres = new MeshResource("plane.obj");
         // Create mesh(es).
         Mesh mesh0 = new Mesh(0, meshres);
+        Mesh floor = new Mesh(1, floorres);
         mesh0.setPosition(0.0f, 0.0f, 6.0f);
+        floor.setPosition(0.0f, -1.5f, 6.0f);
+        floor.setScale(2.0f, 2.0f, 1.0f);
+        floor.setRotation(90.0f, 0.0f, 0.0f);
 
         // Add meshes to panel.
         m_panel.addMesh(mesh0);
+        m_panel.addMesh(floor);
 
         // Set update listener for moving the mesh.
         m_panel.setUpdateListener(new IUpdateListener() {
@@ -178,8 +185,8 @@ public class SoftwareRenderer extends JFrame {
                 // Transform camera based on user input.
                 m_panel.setCameraPosition(
                     new Vector3(
-                        camPos.x + dirX * delta * 2.0f, 
-                        camPos.y + dirY * delta * 2.0f, 
+                        camPos.x + dirX * delta * 2.0f,
+                        camPos.y + dirY * delta * 2.0f,
                         camPos.z + dirZ * delta * 2.0f));
                 m_panel.setCameraRotation(
                     new Vector3(
@@ -202,6 +209,6 @@ public class SoftwareRenderer extends JFrame {
      * Main method. Creates an instance of the renderer with the window size.
      * @param args The command-line arguments passed in by the OS.
      */
-    public static void main(String[] args) { new SoftwareRenderer(1280, 720); }
+    public static void main(String[] args) { new SoftwareRenderer(640, 480); }
 
 }

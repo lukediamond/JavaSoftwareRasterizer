@@ -1,8 +1,8 @@
 /*
  * Luke Diamond
- * Mr. Patterson
- * Grade 11 Final Project
  * 01/22/2018
+ * Grade 11 Final Project
+ * Mr. Patterson
  */
 
 package rasterizer;
@@ -66,10 +66,10 @@ public class RasterPanel extends JPanel {
     IUpdateListener m_listener;
 
     // Resolution divisor (for low-res upscaling, improves FPS).
-    final int RES_DIVISOR = 4;
+    final int RES_DIVISOR = 2;
     // Iteration scale (creates holes in mesh when the camera is close,
     // but greatly improves FPS).
-    final float ITER_SCALE = 0.75f;
+    final float ITER_SCALE = 0.5f;
 
     /**
      * Linearly interpolates between two floats given an alpha value.
@@ -80,7 +80,7 @@ public class RasterPanel extends JPanel {
      */
     private float lerp(float a, float b, float alpha) {
         // Linear interpolation equation. Lower alpha means bigger weight
-        // on A (alpha * a), 
+        // on A (alpha * a),
         // while higher alpha menas bigger weight on B (alpha * b).
         return (1.0f - alpha) * a + alpha * b;
     }
@@ -163,8 +163,8 @@ public class RasterPanel extends JPanel {
     // Define the position of the point light in the scene.
     Vector3 lightPos = new Vector3(0.0f, 3.0f, 3.0f);
     // Define the color of the point light.
-    Color lightColor = new Color(127, 127, 255);
-   
+    Color lightColor = new Color(255, 255, 255);
+
     /**
      * The meat of the rasterizer, handles filling triangles.
      * @param id The ID of the texture to sample.
@@ -194,7 +194,7 @@ public class RasterPanel extends JPanel {
         Vector3 sc = mvp.mult(new Vector4(action.vc, 1.0f)).wdivide();
 
         // Compute surface normal from world-space triangle poly.
-        Vector3 surfaceNormal = 
+        Vector3 surfaceNormal =
             ta.sub(tb).normalize().cross(tc.sub(ta).normalize());
 
         // Discard face if it is facing backwards.
@@ -209,9 +209,9 @@ public class RasterPanel extends JPanel {
         // Compute maximum screen-space distance of vertices.
         final float maxDist =
             Math.max(
-                sa.distance(sb), 
+                sa.distance(sb),
                 Math.max(
-                    sa.distance(sc), 
+                    sa.distance(sc),
                     sb.distance(sc)));
 
         // Compute the amount to increment alphaX and alphaY each iteration.
@@ -251,9 +251,9 @@ public class RasterPanel extends JPanel {
                 Vector3 ssc = mvp.mult(new Vector4(ic, 1.0f)).wdivide();
 
                 if (
-                    ssc.x < -1.0f 
-                    || ssc.x > 1.0f 
-                    || ssc.y < -1.0f 
+                    ssc.x < -1.0f
+                    || ssc.x > 1.0f
+                    || ssc.y < -1.0f
                     || ssc.y > 1.0f) {
                     // Increment discarded (offscreen) fragment debug counter.
                     ++discardedFragments;
@@ -261,21 +261,21 @@ public class RasterPanel extends JPanel {
                 }
 
                 // Calculate the screen coordinates to draw the pixel to.
-                int dcoordX = 
+                int dcoordX =
                     (int) ((ssc.x + 1.0f) * 0.5f * (m_screenWidth - 1));
-                int dcoordY = 
+                int dcoordY =
                     (int) ((ssc.y + 1.0f) * 0.5f * (m_screenHeight - 1));
 
                 // Perform depth test to prevent drawing occluded fragments.
                 synchronized (m_depthBuffer) {
                     if (ssc.z < m_depthBuffer[dcoordX][dcoordY]) {
                         // Compute texture coordinate by blending first
-                        // interpolated coordinate 
+                        // interpolated coordinate
                         // with second interpolated coordinate.
-                        Vector2 it = 
+                        Vector2 it =
                             action.ta.lerp(action.tb, alphaX).lerp(
                                 action.ta.lerp(action.tc, alphaX), alphaY);
-                        // Compute world-space position 
+                        // Compute world-space position
                         // for lighting calculations.
                         Vector3 world =
                             action.model.mult(new Vector4(ic, 1.0f)).wdivide();
@@ -284,15 +284,15 @@ public class RasterPanel extends JPanel {
                         // Sample texture using texture coordinate.
                         Color color = sampleImage(tex, it.x, it.y);
 
-                        // Compute the inverse square attenuation 
+                        // Compute the inverse square attenuation
                         // factor on the light.
                         float dist = world.distance(lightPos);
                         float atten = 1.0f / (1.0f + dist * dist);
 
                         // Calculate light factors.
-                        float diffac = 
-                            8.0f 
-                            * clamp(ldir.dot(surfaceNormal), 0.0f, 1.0f) 
+                        float diffac =
+                            8.0f
+                            * clamp(ldir.dot(surfaceNormal), 0.0f, 1.0f)
                             * atten;
 
                         // Apply attenuation by blending sampled color
@@ -303,14 +303,14 @@ public class RasterPanel extends JPanel {
                         color =
                             lerpColor(
                                 lerpColor(
-                                    Color.BLACK, 
-                                    color, 
+                                    Color.BLACK,
+                                    color,
                                     clamp(
-                                        diffac * diffac,
+                                        diffac,
                                         0.0f,
                                         1.0f)),
                                 lightColor,
-                                clamp(diffac, 0.0f, 1.0f));
+                                clamp(diffac * diffac, 0.0f, 1.0f));
 
                         // Write screen-space depth value to depth buffer.
                         m_depthBuffer[dcoordX][dcoordY] = ssc.z;
@@ -381,7 +381,7 @@ public class RasterPanel extends JPanel {
                 0.01f,
                 1000.0f);
         // Compute view matrix.
-        Matrix4 view = 
+        Matrix4 view =
             Matrix4.rotationX(-m_cameraRotation.x)
             .mult(Matrix4.rotationY(-m_cameraRotation.y))
             .mult(Matrix4.rotationZ(-m_cameraRotation.z))
@@ -409,15 +409,15 @@ public class RasterPanel extends JPanel {
                     // Enqueue draw action.
                     m_drawQueue.add(
                         new DrawAction(
-                            m.getTextureID(), 
-                            m.getTransformMatrix(), 
+                            m.getTextureID(),
+                            m.getTransformMatrix(),
                             view,
                             proj,
-                            m.getVerts()[v + 0], 
-                            m.getVerts()[v + 1], 
-                            m.getVerts()[v + 2], 
-                            m.getCoords()[v + 0], 
-                            m.getCoords()[v + 1], 
+                            m.getVerts()[v + 0],
+                            m.getVerts()[v + 1],
+                            m.getVerts()[v + 2],
+                            m.getCoords()[v + 0],
+                            m.getCoords()[v + 1],
                             m.getCoords()[v + 2]));
                 }
             }
@@ -428,6 +428,7 @@ public class RasterPanel extends JPanel {
         while (m_drawCount != triangleSum) {
             // Force maximum frame time.
             if (System.nanoTime() * 1E-9 - start > 0.5f) break;
+            Thread.yield();
         }
         m_drawCount = 0;
 
@@ -442,9 +443,9 @@ public class RasterPanel extends JPanel {
         // Set the text color to draw the debug info.
         g.setColor(Color.WHITE);
         // Get bytes allocated by JVM instance (in megabytes).
-        float allocated = 
-            Math.round(100.0f * 
-            (((Runtime.getRuntime().totalMemory() 
+        float allocated =
+            Math.round(100.0f *
+            (((Runtime.getRuntime().totalMemory()
             - Runtime.getRuntime().freeMemory()) / 1024.0f / 1024.0f)))
             / 100.0f;
         // Draw debug info.
@@ -458,8 +459,8 @@ public class RasterPanel extends JPanel {
         g.drawString("FPS:                 " + m_FPS, 32, 224);
         g.drawString("MEMORY:              " + allocated + "mb", 32, 256);
         g.drawString(
-            "MOVE WITH WASD. TURN WITH ARROW KEYS.", 
-            32, 
+            "MOVE WITH WASD. TURN WITH ARROW KEYS.",
+            32,
             (m_screenHeight * RES_DIVISOR) - 64);
         // Reset debug info.
         m_drawnFragments = 0;
