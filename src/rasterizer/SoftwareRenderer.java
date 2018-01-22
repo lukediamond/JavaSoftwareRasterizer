@@ -143,13 +143,13 @@ public class SoftwareRenderer extends JFrame {
         m_panel.addTexture(0, "difmap.png");
 
         // Load mesh from file.
-        MeshResource cuberes = new MeshResource("suzanne.obj");
+        MeshResource meshres = new MeshResource("suzanne.obj");
         // Create mesh(es).
-        Mesh cube0 = new Mesh(0, cuberes);
-        cube0.setPosition(0.0f, 0.0f, 6.0f);
+        Mesh mesh0 = new Mesh(0, meshres);
+        mesh0.setPosition(0.0f, 0.0f, 6.0f);
 
         // Add meshes to panel.
-        m_panel.addMesh(cube0);
+        m_panel.addMesh(mesh0);
 
         // Set update listener for moving the mesh.
         m_panel.setUpdateListener(new IUpdateListener() {
@@ -179,7 +179,7 @@ public class SoftwareRenderer extends JFrame {
                         camRot.x + lookDirY * delta * 45.0f,
                         camRot.y + lookDirX * delta * 45.0f,
                         camRot.z));
-                cube0.setRotation(0.0f, 90.0f * elapsed, 0.0f);
+                mesh0.setRotation(0.0f, 90.0f * elapsed, 0.0f);
             }
         });
 

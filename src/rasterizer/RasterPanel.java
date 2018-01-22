@@ -62,7 +62,7 @@ public class RasterPanel extends JPanel {
     final int RES_DIVISOR = 4;
     // Iteration scale (creates holes in mesh when the camera is close,
     // but greatly improves FPS).
-    final float ITER_SCALE = 0.5f;
+    final float ITER_SCALE = 0.75f;
 
     /**
      * Linearly interpolates between two floats given an alpha value.
@@ -154,8 +154,9 @@ public class RasterPanel extends JPanel {
 
 
     // Define the position of the point light in the scene.
-    Vector3 lightPos = new Vector3(0.0f, 1.0f, 4.0f);
-    Color lightColor = new Color(0, 0, 255);
+    Vector3 lightPos = new Vector3(0.0f, 3.0f, 3.0f);
+    // Define the color of the point light.
+    Color lightColor = new Color(127, 127, 255);
    
     /**
      * The meat of the rasterizer, handles filling triangles.
@@ -180,11 +181,14 @@ public class RasterPanel extends JPanel {
         Vector3 ta = action.model.mult(new Vector4(action.va, 1.0f)).wdivide();
         Vector3 tb = action.model.mult(new Vector4(action.vb, 1.0f)).wdivide();
         Vector3 tc = action.model.mult(new Vector4(action.vc, 1.0f)).wdivide();
+        // Compute vertices in screen space.
+        Vector3 sa = mvp.mult(new Vector4(action.va, 1.0f)).wdivide();
+        Vector3 sb = mvp.mult(new Vector4(action.vb, 1.0f)).wdivide();
+        Vector3 sc = mvp.mult(new Vector4(action.vc, 1.0f)).wdivide();
 
         // Compute surface normal from world-space triangle poly.
         Vector3 surfaceNormal = 
-            ta.sub(tb).cross(tc.sub(tb))
-            .normalize();
+            ta.sub(tb).normalize().cross(tc.sub(ta).normalize());
 
         // Discard face if it is facing backwards.
         if (new Vector3(action.view.c).normalize().dot(surfaceNormal) < 0.0f) {
@@ -198,15 +202,15 @@ public class RasterPanel extends JPanel {
         // Compute maximum screen-space distance of vertices.
         final float maxDist =
             Math.max(
-                ta.distance(tb), 
+                sa.distance(sb), 
                 Math.max(
-                    ta.distance(tc), 
-                    tb.distance(tc)));
+                    sa.distance(sc), 
+                    sb.distance(sc)));
 
         // Compute the amount to increment alphaX and alphaY each iteration.
-        final float ITER_X_INV = 
+        final float ITER_X_INV =
             1.0f / (m_screenWidth * maxDist * ITER_SCALE);
-        final float ITER_Y_INV = 
+        final float ITER_Y_INV =
             1.0f / (m_screenHeight * maxDist * ITER_SCALE);
 
         // Return if computation is too strenuous.
@@ -277,6 +281,13 @@ public class RasterPanel extends JPanel {
                         // factor on the light.
                         float dist = world.distance(lightPos);
                         float atten = 1.0f / (1.0f + dist * dist);
+
+                        // Calculate light factors.
+                        float diffac = 
+                            8.0f 
+                            * clamp(ldir.dot(surfaceNormal), 0.0f, 1.0f) 
+                            * atten;
+
                         // Apply attenuation by blending sampled color
                         // with black using the attenuation factor as the alpha.
                         // Also apply directional occlusion by finding the dot
@@ -288,13 +299,11 @@ public class RasterPanel extends JPanel {
                                     Color.BLACK, 
                                     color, 
                                     clamp(
-                                        4.0f 
-                                        * atten 
-                                        * Math.abs(ldir.dot(surfaceNormal)),
+                                        diffac * diffac,
                                         0.0f,
                                         1.0f)),
                                 lightColor,
-                                clamp(atten * 1.0f, 0.0f, 1.0f));
+                                clamp(diffac, 0.0f, 1.0f));
 
                         // Write screen-space depth value to depth buffer.
                         m_depthBuffer[dcoordX][dcoordY] = ssc.z;
@@ -344,7 +353,7 @@ public class RasterPanel extends JPanel {
     // FPS time accumulator.
     float m_fpsAccumulator = 0.0f;
     // Number of frames drawn.
-    int   m_frames = 0;
+    int m_frames = 0;
 
     /**
      * Overriden JPanel paintComponent, for drawing the rasterized scene.
@@ -361,7 +370,7 @@ public class RasterPanel extends JPanel {
             Matrix4.perspective(
                 (float) m_backBuffer.getWidth()
                 / (float) m_backBuffer.getHeight(),
-                70.0f,
+                45.0f,
                 0.01f,
                 1000.0f);
         // Compute view matrix.
